@@ -10,6 +10,7 @@ import 'appstore_client.dart';
 import 'demo.dart';
 import 'ga4_client.dart';
 import 'admob_client.dart';
+import 'insights.dart';
 import 'play_client.dart';
 import 'secret_store.dart';
 import 'store_series.dart';
@@ -258,8 +259,20 @@ class AppState extends ChangeNotifier {
     return r.appId;
   }
 
-  /// Son tam günde belirgin düşüşler (seçili uygulama için).
+  /// Son tam günde belirgin düşüş ve sıçramalar (seçili uygulama için).
   List<Drop> drops = const [];
+
+  /// Kurallardan çıkan teşhisler (seçili uygulama için).
+  List<Insight> insights = const [];
+
+  /// Ekran paylaşırken para tutarları gizlenir.
+  bool get hideMoney => _prefs.getBool('ui.hideMoney') ?? false;
+
+  Future<void> setHideMoney(bool v) async {
+    await _prefs.setBool('ui.hideMoney', v);
+    insights = diagnose(this);
+    notifyListeners();
+  }
 
   /// Açılışta kayıtlı bağlantılar kasadan okunurken true.
   bool restoring = true;
@@ -269,6 +282,18 @@ class AppState extends ChangeNotifier {
   bool get playOn => demoMode || play != null;
   bool get anyReady =>
       ga4Ready || appStore != null || play != null || admob != null;
+
+  /// İlk açılışta kurulum sihirbazı gösterilsin mi.
+  bool get needsSetup =>
+      !demoMode &&
+      !restoring &&
+      !anyReady &&
+      !(_prefs.getBool('setup.done') ?? false);
+
+  Future<void> markSetupDone() async {
+    await _prefs.setBool('setup.done', true);
+    notifyListeners();
+  }
 
   /// Gizli olmayan kayıtlı ayar (ayar pencerelerini doldurmak için).
   String? pref(String key) => _prefs.getString(key);
@@ -340,12 +365,27 @@ class AppState extends ChangeNotifier {
   }) async {
     final key = p8 ?? await _secrets.read(SecretStore.appStoreKey);
     if (key == null) throw const StoreException('.p8 anahtar dosyasını seçin.');
-    final client = AppStoreClient(
+    final problem = AppStoreClient.checkInput(
       p8: key,
       keyId: keyId.trim(),
       issuerId: issuerId.trim(),
       vendor: vendor.trim(),
     );
+    if (problem != null) throw StoreException(problem);
+    final AppStoreClient client;
+    try {
+      client = AppStoreClient(
+        p8: key,
+        keyId: keyId.trim(),
+        issuerId: issuerId.trim(),
+        vendor: vendor.trim(),
+      );
+    } catch (_) {
+      throw const StoreException(
+        'Bu dosya okunamadı. App Store Connect\'ten indirilen AuthKey_….p8 '
+        'dosyasını seçin.',
+      );
+    }
     final data = await client.series();
     await _secrets.write(SecretStore.appStoreKey, key);
     await _prefs.setString('appstore.keyId', client.keyId);
@@ -636,6 +676,7 @@ class AppState extends ChangeNotifier {
     if (stores) _storesAt = DateTime.now();
     _checkDrops(app);
     if (stores) _checkReviews();
+    insights = diagnose(this);
     loading = false;
     notifyListeners();
     if (_again) {
@@ -686,20 +727,39 @@ class AppState extends ChangeNotifier {
         ('App Store', appStoreData),
         ('Google Play', playData),
       ])
-        if (data?.last case final last?)
+        if (data?.last case final last?) ...[
           ?Drop.find(
             data!.values,
             source: name,
             metric: 'kurulum',
             date: last.date,
           ),
+          // Günlük ortalama 20 doların altında gürültü sayılır.
+          if (data.hasRevenue)
+            ?Drop.find(
+              data.revenueCents,
+              source: name,
+              metric: 'gelir',
+              date: last.date,
+              minBase: 2000,
+              money: true,
+            ),
+        ],
     ];
     final scope = app?.name ?? 'Tüm uygulamalar';
     for (final d in drops) {
-      final key = 'drop.${app?.id ?? 'all'}.${d.source}';
+      // Eski anahtar biçimi kurulum ve kullanıcı düşüşü için korunur.
+      final key = !d.money && !d.up
+          ? 'drop.${app?.id ?? 'all'}.${d.source}'
+          : 'drop.${app?.id ?? 'all'}.${d.source}.${d.metric}.${d.up}';
       if (_prefs.getString(key) == d.date) continue;
       unawaited(_prefs.setString(key, d.date));
-      unawaited(Notifier.show('$scope: düşüş', d.text).catchError((_) {}));
+      unawaited(
+        Notifier.show(
+          d.up ? '$scope: sıçrama 🔥' : '$scope: düşüş',
+          d.textFor(hideMoney: hideMoney),
+        ).catchError((_) {}),
+      );
     }
   }
 

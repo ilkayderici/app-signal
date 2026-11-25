@@ -1,7 +1,9 @@
 import 'dart:convert';
 
+import 'package:archive/archive.dart';
 import 'package:googleapis_auth/auth_io.dart';
 
+import 'fx.dart';
 import 'store_series.dart';
 
 /// Play Console toplu raporlarından (Cloud Storage kovası) günlük kurulumları
@@ -24,9 +26,29 @@ class PlayClient {
   }
 
   static Future<PlayClient> connect(String json, String bucket) async {
-    final map = jsonDecode(json) as Map<String, dynamic>;
-    if (map['type'] != 'service_account') {
-      throw const StoreException('Bu dosya bir servis hesabı anahtarı değil.');
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(json);
+    } on FormatException {
+      throw const StoreException(
+        'Dosya okunamadı: geçerli bir JSON değil. Google Cloud > IAM > '
+        'Servis hesapları > Anahtarlar\'dan indirilen JSON dosyasını seçin.',
+      );
+    }
+    if (decoded is! Map<String, dynamic> ||
+        decoded['type'] != 'service_account') {
+      throw const StoreException(
+        'Bu dosya bir servis hesabı anahtarı değil. OAuth istemci dosyası '
+        'değil, servis hesabının JSON anahtarı gerekiyor.',
+      );
+    }
+    final map = decoded;
+    if (!normalizeBucket(bucket).startsWith('pubsite_prod_')) {
+      throw const StoreException(
+        'Kova adı pubsite_prod_ ile başlamalı. Play Console > Raporları '
+        'indir > İstatistikler\'deki "Cloud Storage URI\'sini kopyala" '
+        'düğmesiyle alın.',
+      );
     }
     final creds = ServiceAccountCredentials.fromJson(map);
     final client = await clientViaServiceAccount(creds, [
@@ -61,7 +83,66 @@ class PlayClient {
         }
       }
     }
-    return StoreSeries(byDate);
+    final money = await revenue(months: months, from: from, package: package);
+    return StoreSeries(
+      byDate,
+      revenue: money == null
+          ? null
+          : {for (final d in byDate.keys) d: money[d] ?? 0},
+    );
+  }
+
+  /// Satış raporundan günlük tahmini net gelir (USD): vergisiz fiyatın
+  /// %85'i, iadeler düşülür. "Finansal verileri görüntüleme" izni ya da kur
+  /// yoksa null.
+  Future<Map<String, double>?> revenue({
+    required Set<String> months,
+    required String from,
+    String? package,
+  }) async {
+    final byDate = <String, Map<String, double>>{};
+    for (final m in months) {
+      final name = 'sales/salesreport_$m.zip';
+      final res = await _client.get(
+        Uri.parse('$_api/b/$bucket/o/${Uri.encodeComponent(name)}?alt=media'),
+      );
+      if (res.statusCode == 404) continue;
+      if (res.statusCode != 200) return null;
+      final Archive zip;
+      try {
+        zip = ZipDecoder().decodeBytes(res.bodyBytes);
+      } catch (_) {
+        return null;
+      }
+      for (final f in zip.files) {
+        if (!f.isFile || !f.name.toLowerCase().endsWith('.csv')) continue;
+        for (final r in _parseCsv(f.content)) {
+          final date = r['Order Charged Date'] ?? '';
+          if (date.compareTo(from) < 0) continue;
+          if (package != null && r['Product ID'] != package) continue;
+          final status = (r['Financial Status'] ?? '').toLowerCase();
+          final sign = status.contains('refund')
+              ? -1
+              : status.contains('charged')
+              ? 1
+              : 0;
+          if (sign == 0) continue;
+          final price =
+              double.tryParse((r['Item Price'] ?? '').replaceAll(',', '')) ??
+              0;
+          addMoney(
+            byDate.putIfAbsent(date, () => {}),
+            r['Currency of Sale'] ?? '',
+            sign * price * 0.85,
+          );
+        }
+      }
+    }
+    final rates = await Fx.rates();
+    if (rates == null) return null;
+    return {
+      for (final e in byDate.entries) e.key: ?Fx.toUsd(e.value, rates),
+    };
   }
 
   /// Aktif abone sayısı (abonelik raporlarının en yeni günü). Rapor ya da
@@ -178,6 +259,9 @@ class PlayClient {
     final res = await _client.get(uri);
     if (res.statusCode == 200) return res.bodyBytes;
     throw StoreException(switch (res.statusCode) {
+      401 =>
+        'Google Play: servis hesabı anahtarı geçersiz ya da silinmiş. Google '
+            'Cloud\'da bu hesap için yeni bir JSON anahtarı oluşturun.',
       403 =>
         'Google Play: $email kovayı okuyamıyor. Play Console > '
             'Kullanıcılar ve izinler\'de "Uygulama bilgilerini görüntüleme ve '

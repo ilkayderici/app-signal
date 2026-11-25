@@ -1,4 +1,6 @@
 import 'app_state.dart';
+import 'drops.dart';
+import 'insights.dart';
 import 'store_series.dart';
 
 /// `--dart-define=APP_SIGNAL_DEMO=true` ile derlenince panel ağa çıkmadan
@@ -80,14 +82,38 @@ void fillDemo(AppState s) {
     month: 402.15,
     real: true,
   );
+  Map<String, double> money(List<double> v) => {
+    for (var i = 0; i < v.length; i++) day(v.length + 1 - i): v[i],
+  };
+
   s.appStoreData = StoreSeries(
     series(const [38, 42, 35, 51, 47, 44, 39, 56, 61, 48, 52, 45, 58, 63]),
+    revenue: money(const [
+      21.4, 18.9, 25.2, 19.7, 23.1, 27.5, 22.0, //
+      24.8, 29.3, 26.1, 31.0, 28.4, 30.2, 64.7,
+    ]),
   );
   s.appStoreRating = const RatingSummary(4.6, 38);
   s.playData = StoreSeries(
     series(const [71, 66, 80, 74, 92, 85, 78, 88, 95, 81, 90, 102, 97, 89]),
+    revenue: money(const [
+      9.8, 11.2, 8.7, 12.4, 10.1, 9.5, 11.9, //
+      12.6, 10.8, 13.4, 11.7, 14.2, 12.9, 13.5,
+    ]),
   );
   s.playRating = const RatingSummary(4.4, 57);
+  s.drops = [
+    Drop(
+      source: 'App Store',
+      metric: 'gelir',
+      date: day(2),
+      last: 6470,
+      base: 2854,
+      up: true,
+      money: true,
+    ),
+  ];
+  s.insights = diagnose(s);
   s.restoring = false;
 }
 

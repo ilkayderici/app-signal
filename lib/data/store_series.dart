@@ -1,9 +1,9 @@
-/// Bir mağazanın günlük kurulum sayıları. Yalnız raporu gelmiş günler
-/// tutulur; mağazalar veriyi bir iki gün gecikmeli verir.
+/// Bir mağazanın günlük kurulum sayıları ve net geliri (USD). Yalnız raporu
+/// gelmiş günler tutulur; mağazalar veriyi bir iki gün gecikmeli verir.
 class StoreSeries {
-  StoreSeries(Map<String, int> byDate)
+  StoreSeries(Map<String, int> byDate, {Map<String, double>? revenue})
     : days = (byDate.entries.toList()..sort((a, b) => a.key.compareTo(b.key)))
-          .map((e) => StoreDay(e.key, e.value))
+          .map((e) => StoreDay(e.key, e.value, revenue?[e.key]))
           .toList();
 
   /// Eskiden yeniye; tarih yyyy-MM-dd.
@@ -12,18 +12,48 @@ class StoreSeries {
   StoreDay? get last => days.isEmpty ? null : days.last;
 
   /// Son 7 raporlu günün toplamı.
-  int get week => days
-      .skip(days.length > 7 ? days.length - 7 : 0)
-      .fold(0, (a, d) => a + d.count);
+  int get week => _window(0).fold(0, (a, d) => a + d.count);
+
+  /// Ondan önceki 7 günün toplamı; o kadar veri yoksa null.
+  int? get prevWeek =>
+      days.length < 14 ? null : _window(7).fold<int>(0, (a, d) => a + d.count);
 
   List<int> get values => [for (final d in days) d.count];
+
+  /// Gelir okunabildi mi (rapor izni ve kur varsa).
+  bool get hasRevenue => days.any((d) => d.revenue != null);
+
+  /// Son 7 günün net geliri; bilinmiyorsa null.
+  double? get weekRevenue => _sum(_window(0));
+
+  double? get prevWeekRevenue => days.length < 14 ? null : _sum(_window(7));
+
+  /// Günlük gelir, kuruş (bilinmeyen gün 0).
+  List<int> get revenueCents => [
+    for (final d in days) ((d.revenue ?? 0) * 100).round(),
+  ];
+
+  /// Sondan [skip] gün atlayıp önceki 7 gün.
+  Iterable<StoreDay> _window(int skip) {
+    final end = days.length - skip;
+    if (end <= 0) return const [];
+    return days.sublist(end > 7 ? end - 7 : 0, end);
+  }
+
+  static double? _sum(Iterable<StoreDay> w) {
+    if (!w.any((d) => d.revenue != null)) return null;
+    return w.fold<double>(0, (a, d) => a + (d.revenue ?? 0));
+  }
 }
 
 class StoreDay {
-  const StoreDay(this.date, this.count);
+  const StoreDay(this.date, this.count, [this.revenue]);
 
   final String date;
   final int count;
+
+  /// Net gelir, USD; bilinmiyorsa null.
+  final double? revenue;
 
   /// "24.11" biçimi.
   String get short => '${date.substring(8, 10)}.${date.substring(5, 7)}';

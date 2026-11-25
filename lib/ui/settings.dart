@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import 'ga4_settings.dart';
 import 'logos.dart';
+import 'setup_wizard.dart';
 import 'store_settings.dart';
 import 'theme.dart';
 
@@ -66,12 +67,19 @@ Future<void> showSettings(BuildContext context, AppState state) {
                 onTap: () => showAdmobSettings(context, state),
               ),
               const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Kapat'),
-                ),
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => showSetupWizard(context, state),
+                    icon: const Icon(Icons.auto_fix_high, size: 16),
+                    label: const Text('Kurulum sihirbazı'),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Kapat'),
+                  ),
+                ],
               ),
             ],
           ),

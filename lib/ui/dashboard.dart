@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/legacy.dart';
 
 import '../data/app_state.dart';
+import '../data/drops.dart';
+import '../data/insights.dart';
 import '../data/store_series.dart';
 import 'settings.dart';
+import 'setup_wizard.dart';
 import 'ga4_settings.dart';
 import 'store_settings.dart';
 import 'edge_dock.dart';
@@ -34,6 +37,10 @@ class Dashboard extends StatelessWidget {
             void openAdmob() => showAdmobSettings(context, state);
             final data = state.ga4Data;
             final revenue = state.admobData ?? data?.revenue;
+            _hideMoney = state.hideMoney;
+            final storeMoney =
+                (state.appStoreData?.hasRevenue ?? false) ||
+                (state.playData?.hasRevenue ?? false);
             return Column(
               children: [
                 _TopBar(
@@ -48,6 +55,14 @@ class Dashboard extends StatelessWidget {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
                     children: [
+                      if (state.needsSetup) ...[
+                        _Placeholder(
+                          'Başlamak için kurulum sihirbazını açın: her veri '
+                          'kaynağı için ne gerektiğini adım adım gösterir.',
+                          onTap: () => showSetupWizard(context, state),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       for (final (msg, tap) in [
                         (
                           state.ga4Error == null
@@ -64,7 +79,7 @@ class Dashboard extends StatelessWidget {
                           const SizedBox(height: 10),
                         ],
                       for (final d in state.drops) ...[
-                        _DropBox(d.text),
+                        _DropBox(d, hideMoney: state.hideMoney),
                         const SizedBox(height: 10),
                       ],
                       Row(
@@ -139,6 +154,22 @@ class Dashboard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (storeMoney) ...[
+                        const SizedBox(height: 10),
+                        _StoreRevenueCard(
+                          appStore: state.appStoreData,
+                          play: state.playData,
+                        ),
+                      ],
+                      if (state.insights.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        const _SectionTitle('BUGÜN BAKMAN GEREKEN'),
+                        const SizedBox(height: 8),
+                        for (final i in state.insights) ...[
+                          _InsightTile(i),
+                          const SizedBox(height: 8),
+                        ],
+                      ],
                       if (state.lowReviews.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         _LowReviews(state),
@@ -197,7 +228,11 @@ class Dashboard extends StatelessWidget {
 String _hm(DateTime t) =>
     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
+/// Ekran paylaşımı için: açıkken tüm tutarlar "•••" yazılır.
+bool _hideMoney = false;
+
 String _money(double v, [String currency = 'USD']) {
+  if (_hideMoney) return '•••';
   const signs = {'USD': '\$', 'EUR': '€', 'TRY': '₺', 'GBP': '£'};
   final sign = signs[currency];
   final n = v.toStringAsFixed(v < 10 ? 2 : 0);
@@ -262,6 +297,14 @@ class _TopBarState extends State<_TopBar> {
               onTap: s.anyReady && !s.loading
                   ? () => s.refresh(force: true)
                   : null,
+            ),
+            _BarButton(
+              icon: s.hideMoney
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              tooltip: s.hideMoney ? 'Tutarları göster' : 'Tutarları gizle',
+              active: s.hideMoney,
+              onTap: () => s.setHideMoney(!s.hideMoney),
             ),
             _BarButton(
               icon: _pinned ? Icons.push_pin : Icons.push_pin_outlined,
@@ -1041,30 +1084,160 @@ class _LowReviews extends StatelessWidget {
   }
 }
 
-/// Düşüş uyarısı: turuncu şerit, aşağı ok.
+/// Düşüş uyarısı turuncu şerit ve aşağı ok; sıçrama yeşil şerit, yukarı ok.
 class _DropBox extends StatelessWidget {
-  const _DropBox(this.message);
+  const _DropBox(this.drop, {this.hideMoney = false});
 
-  final String message;
+  final Drop drop;
+  final bool hideMoney;
 
   @override
   Widget build(BuildContext context) {
+    final up = drop.up;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0x22FFA94D),
+        color: up ? const Color(0x2235D07F) : const Color(0x22FFA94D),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          const Icon(Icons.trending_down, size: 16, color: Color(0xFFFFB86B)),
+          Icon(
+            up ? Icons.trending_up : Icons.trending_down,
+            size: 16,
+            color: up ? const Color(0xFF5BE09A) : const Color(0xFFFFB86B),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              message,
-              style: const TextStyle(color: Color(0xFFFFC48A), fontSize: 12),
+              drop.textFor(hideMoney: hideMoney),
+              style: TextStyle(
+                color: up ? const Color(0xFF8FEBB9) : const Color(0xFFFFC48A),
+                fontSize: 12,
+              ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mağaza net geliri (USD): App Store raporu ve Play tahmini yan yana.
+class _StoreRevenueCard extends StatelessWidget {
+  const _StoreRevenueCard({this.appStore, this.play});
+
+  final StoreSeries? appStore;
+  final StoreSeries? play;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget cell(String source, Color color, StoreSeries? d) {
+      final last = d?.last;
+      final known = d != null && d.hasRevenue;
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              known && last?.revenue != null ? _money(last!.revenue!) : '—',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              known
+                  ? '${last!.short} · 7g ${_money(d.weekRevenue ?? 0)}'
+                  : 'izin yok',
+              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+            ),
+            const Spacer(),
+            sourceLabel(source, color),
+          ],
+        ),
+      );
+    }
+
+    return _Card(
+      icon: Icons.storefront_outlined,
+      title: 'MAĞAZA GELİRİ · NET',
+      color: AppColors.appStore,
+      body: Row(
+        children: [
+          cell('App Store', AppColors.appStore, appStore),
+          const SizedBox(width: 12),
+          cell('Google Play', AppColors.play, play),
+        ],
+      ),
+      footer: const Tooltip(
+        message:
+            'App Store: raporlanan net gelir. Google Play: vergisiz fiyatın '
+            '%85\'i (tahmini). Kurlar open.er-api.com\'dan.',
+        child: Text(
+          'USD · Play tahmini',
+          style: TextStyle(fontSize: 11, color: AppColors.muted),
+        ),
+      ),
+    );
+  }
+}
+
+/// Teşhis: başlık, neden ve ne yapılmalı.
+class _InsightTile extends StatelessWidget {
+  const _InsightTile(this.insight);
+
+  final Insight insight;
+
+  @override
+  Widget build(BuildContext context) {
+    final good = insight.good;
+    final color = good ? const Color(0xFF5BE09A) : const Color(0xFFFFB86B);
+    Widget line(String label, String text) => Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '$label  ',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+                color: AppColors.muted,
+              ),
+            ),
+            TextSpan(text: text),
+          ],
+        ),
+        style: const TextStyle(fontSize: 12, height: 1.35),
+      ),
+    );
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: Glass.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                good ? Icons.check_circle_outline : Icons.error_outline,
+                size: 15,
+                color: color,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  insight.title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          line('NEDEN', insight.why),
+          line('NE YAP', insight.todo),
         ],
       ),
     );

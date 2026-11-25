@@ -22,6 +22,7 @@
 - Aktif kullanıcı, indirme, yorum ve reklam geliri tek pencerede.
 - Pencere masaüstünde açık kalır, rakamlar kendiliğinden yenilenir.
 - Veriler Google ve Apple'dan doğrudan bilgisayarınıza gelir. App Signal'in sunucusu yoktur.
+- Mağaza gelirini dolara çevirmek için döviz kurları günde birkaç kez [open.er-api.com](https://open.er-api.com)'dan alınır. Bu istekte sizinle ilgili hiçbir veri gönderilmez.
 - Google erişimi yalnız okuma iznidir (`analytics.readonly`, `admob.readonly`).
 - Anahtarlar ve giriş jetonları yalnız işletim sisteminin şifre kasasında saklanır.
 
@@ -67,6 +68,7 @@ A small desktop window for app developers. It shows your own numbers from Google
 
 - Active users, downloads, reviews and ad revenue in one window.
 - Data goes straight from Google and Apple to your computer. App Signal has no server.
+- To convert store revenue to USD, exchange rates are fetched from [open.er-api.com](https://open.er-api.com) a few times a day. That request sends no data about you.
 - Google access is read-only. Keys and tokens are stored only in the OS keychain.
 
 **Build:** `flutter pub get && flutter run -d macos`. For Google sign-in, create a Desktop OAuth client in Google Cloud and save its JSON as `assets/admob_oauth_client.json` (gitignored).

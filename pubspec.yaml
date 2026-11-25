@@ -46,6 +46,7 @@ dependencies:
   flutter_local_notifications: ^23.0.4
   url_launcher: ^6.3.3
   auto_updater: ^1.0.0
+  archive: ^4.7.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
