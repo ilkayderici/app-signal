@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1D2430"/>
+      <stop offset="1" stop-color="#0B0E13"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.7" cy="0.3" r="0.55">
+      <stop offset="0" stop-color="#3DDC97" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#3DDC97" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="sq"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <g clip-path="url(#sq)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>
+    <!-- Dört kaynak: GA4, App Store, Google Play, AdMob -->
+    <rect x="228" y="600" width="104" height="194" rx="52" fill="#F5A623"/>
+    <rect x="380" y="510" width="104" height="284" rx="52" fill="#5AC8FA"/>
+    <rect x="532" y="420" width="104" height="374" rx="52" fill="#34C759"/>
+    <rect x="684" y="420" width="104" height="374" rx="52" fill="#4C8DFF" opacity="0"/>
+    <!-- Son sütunun yerinde sinyal: nokta ve halkalar -->
+    <circle cx="736" cy="330" r="150" fill="none" stroke="#3DDC97" stroke-opacity="0.22" stroke-width="22"/>
+    <circle cx="736" cy="330" r="96" fill="none" stroke="#3DDC97" stroke-opacity="0.5" stroke-width="22"/>
+    <circle cx="736" cy="330" r="52" fill="#3DDC97"/>
+    <rect x="684" y="470" width="104" height="324" rx="52" fill="#4C8DFF"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#shine)"/>
+  </g>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="3"/>
+</svg>
