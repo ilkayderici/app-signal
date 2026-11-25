@@ -170,10 +170,7 @@ class Dashboard extends StatelessWidget {
                       ],
                       if (data?.retention != null) ...[
                         const SizedBox(height: 10),
-                        _RetentionCard(
-                          data!.retention!,
-                          newToday: data.newToday,
-                        ),
+                        _RetentionCard(data!.retention!),
                       ],
                       // Kırılım tablosu isteğe bağlı: GA4 bağlı ama boyut
                       // seçilmemişse bölüm hiç gösterilmez.
@@ -801,30 +798,11 @@ class _RevenueCard extends StatelessWidget {
   }
 }
 
-/// Kaynak logosu ve yanında kısa not ("tahmini", "tutunma").
-class _LogoNote extends StatelessWidget {
-  const _LogoNote(this.source, this.note);
-
-  final String source;
-  final String note;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      sourceLabel(source, AppColors.ga4),
-      const SizedBox(width: 6),
-      Text(note, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-    ],
-  );
-}
-
 /// Yeni kullanıcıların D1, D7 ve D30 dönme oranı (GA4 kohort raporu).
 class _RetentionCard extends StatelessWidget {
-  const _RetentionCard(this.r, {required this.newToday});
+  const _RetentionCard(this.r);
 
   final Retention r;
-  final int newToday;
 
   @override
   Widget build(BuildContext context) {
@@ -860,16 +838,7 @@ class _RetentionCard extends StatelessWidget {
           cell('D30', r.d30, r.d30Users),
         ],
       ),
-      footer: Row(
-        children: [
-          const _LogoNote('GA4', 'Tutunma'),
-          const Spacer(),
-          Text(
-            'Bugün yeni $newToday',
-            style: const TextStyle(fontSize: 12, color: AppColors.text),
-          ),
-        ],
-      ),
+      footer: const SizedBox.shrink(),
     );
   }
 }
@@ -1236,7 +1205,7 @@ class _StoreRevenueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget cell(StoreSeries? d) {
+    Widget cell(String source, StoreSeries? d) {
       final last = d?.last;
       final known = d != null && d.hasRevenue;
       return Expanded(
@@ -1250,13 +1219,24 @@ class _StoreRevenueCard extends StatelessWidget {
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 2),
-            Text(
-              known
-                  ? '${last!.short} · 7g ${_money(d.weekRevenue ?? 0)}'
-                  : 'izin yok',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+            Row(
+              children: [
+                ?sourceLogo(source, size: 12),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    known
+                        ? '${last!.short} · 7g ${_money(d.weekRevenue ?? 0)}'
+                        : 'izin yok',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1268,13 +1248,11 @@ class _StoreRevenueCard extends StatelessWidget {
       title: 'MAĞAZA GELİRİ · NET',
       color: AppColors.appStore,
       body: Row(
-        children: [cell(appStore), const SizedBox(width: 12), cell(play)],
-      ),
-      footer: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: sourceLabel('App Store', AppColors.appStore)),
+          cell('App Store', appStore),
           const SizedBox(width: 12),
-          Expanded(child: sourceLabel('Google Play', AppColors.play)),
+          cell('Google Play', play),
           const Tooltip(
             message:
                 'USD. App Store: raporlanan net gelir. Google Play: vergisiz '
@@ -1283,6 +1261,7 @@ class _StoreRevenueCard extends StatelessWidget {
           ),
         ],
       ),
+      footer: const SizedBox.shrink(),
     );
   }
 }
