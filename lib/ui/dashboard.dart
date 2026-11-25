@@ -118,8 +118,7 @@ class Dashboard extends StatelessWidget {
                             child: _InstallCard(
                               source: 'App Store',
                               color: AppColors.appStore,
-                              connected:
-                                  state.appStore != null || state.restoring,
+                              connected: state.appStoreOn || state.restoring,
                               missing: state.appStoreMissing,
                               data: state.appStoreData,
                               rating: state.appStoreRating,
@@ -131,7 +130,7 @@ class Dashboard extends StatelessWidget {
                             child: _InstallCard(
                               source: 'Google Play',
                               color: AppColors.play,
-                              connected: state.play != null || state.restoring,
+                              connected: state.playOn || state.restoring,
                               missing: state.playMissing,
                               data: state.playData,
                               rating: state.playRating,

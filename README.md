@@ -11,6 +11,10 @@
 
 <p align="center">macOS · Windows · <a href="#english">English</a></p>
 
+<p align="center">
+  <img src="docs/screenshot.png" width="420" alt="App Signal (örnek veri)">
+</p>
+
 ---
 
 ## Ne yapar

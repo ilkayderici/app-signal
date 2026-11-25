@@ -7,6 +7,7 @@ import 'app_icons.dart';
 import 'drops.dart';
 
 import 'appstore_client.dart';
+import 'demo.dart';
 import 'ga4_client.dart';
 import 'admob_client.dart';
 import 'play_client.dart';
@@ -184,6 +185,10 @@ class AppState extends ChangeNotifier {
     final s = AppState._(await SharedPreferences.getInstance());
     s.ga4Settings = Ga4Settings.load(s._prefs);
     s.selectedAppId = s._prefs.getString('app.selected');
+    if (demoMode) {
+      fillDemo(s);
+      return s;
+    }
     // Ağ beklenmeden pencere açılsın; veri gelince kartlar dolar.
     unawaited(s._restore());
     s._timer = Timer.periodic(const Duration(minutes: 5), (_) => s.refresh());
@@ -259,7 +264,9 @@ class AppState extends ChangeNotifier {
   /// Açılışta kayıtlı bağlantılar kasadan okunurken true.
   bool restoring = true;
 
-  bool get ga4Ready => ga4 != null && ga4Settings != null;
+  bool get ga4Ready => demoMode || ga4 != null && ga4Settings != null;
+  bool get appStoreOn => demoMode || appStore != null;
+  bool get playOn => demoMode || play != null;
   bool get anyReady =>
       ga4Ready || appStore != null || play != null || admob != null;
 
@@ -611,7 +618,7 @@ class AppState extends ChangeNotifier {
       _again = true;
       return;
     }
-    if (!anyReady) return;
+    if (!anyReady || demoMode) return;
     final stores =
         force ||
         _storesAt == null ||
