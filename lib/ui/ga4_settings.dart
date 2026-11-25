@@ -6,7 +6,7 @@ import '../data/app_state.dart';
 import '../data/ga4_client.dart';
 import 'theme.dart';
 
-/// GA4 bağlama penceresi: JSON yükle, mülk seç, oyun boyutunu seç.
+/// GA4 bağlama penceresi: JSON yükle, mülk seç, kırılım boyutunu seç.
 Future<void> showGa4Settings(BuildContext context, AppState state) {
   return showDialog(
     context: context,
@@ -210,7 +210,7 @@ class _Ga4SettingsState extends State<_Ga4Settings> {
               if (_meta != null) ...[
                 const SizedBox(height: 10),
                 _Dropdown<String?>(
-                  label: 'Oyun / ekran boyutu',
+                  label: 'Kırılım boyutu (ekran, içerik, seviye…)',
                   value: _gameDim,
                   items: {
                     null: 'Yok',
@@ -220,8 +220,8 @@ class _Ga4SettingsState extends State<_Ga4Settings> {
                 ),
                 const SizedBox(height: 4),
                 const _Help(
-                  'İsteğe bağlı. Oyun bazında bir özel boyutunuz yoksa "Yok" '
-                  'bırakın; oyun tablosu gizlenir.',
+                  'İsteğe bağlı. Rakamları bir boyuta göre ayırmak istemiyorsanız '
+                  '"Yok" bırakın; kırılım tablosu gizlenir.',
                 ),
                 const SizedBox(height: 10),
                 _Dropdown<String?>(
@@ -245,7 +245,7 @@ class _Ga4SettingsState extends State<_Ga4Settings> {
                 ),
                 const SizedBox(height: 10),
                 _Dropdown<int?>(
-                  label: 'Gösterilecek oyun sayısı',
+                  label: 'Gösterilecek satır sayısı',
                   value: _limit,
                   items: const {3: '3', 5: '5', 10: '10', 20: '20', 0: 'Hepsi'},
                   onChanged: (v) => setState(() => _limit = v ?? 5),

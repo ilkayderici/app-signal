@@ -78,13 +78,11 @@ final _steps = [
     title: 'Google Play',
     gives: 'Günlük kurulum, tahmini net gelir, aktif abone, puan ve yorumlar.',
     needs: const [
-      'Google Cloud\'da servis hesabı ve JSON anahtarı (GA4\'teki aynı '
-          'hesap da olur).',
-      'Play Console > Kullanıcılar ve izinler\'de bu e-postaya "Uygulama '
-          'bilgilerini görüntüleme ve toplu raporları indirme" izni. Gelir '
-          'için "Finansal verileri görüntüleme" de gerekir.',
-      'Play Console > Raporları indir\'deki pubsite_prod_… kova adı.',
-      'İzinlerin yansıması 24 saati bulabilir.',
+      'Play Console > Raporları indir > İstatistikler\'deki Cloud Storage '
+          'URI (gs://pubsite_prod_…, "Cloud Storage URI\'sini kopyala").',
+      'Play Console\'a erişimi olan Google hesabıyla giriş. Gelir için '
+          'hesabın "Finansal verileri görüntüleme" izni olmalı.',
+      'İsterseniz giriş yerine servis hesabı JSON\'u da kullanılabilir.',
     ],
     connected: (s) => s.play != null,
     error: (s) => s.playError,

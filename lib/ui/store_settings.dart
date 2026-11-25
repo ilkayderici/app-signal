@@ -28,7 +28,7 @@ Future<void> showAppStoreSettings(BuildContext context, AppState state) =>
 Future<void> showAdmobSettings(BuildContext context, AppState state) =>
     _show(context, _AdmobSettings(state: state));
 
-/// Google Play bağlama: servis hesabı JSON'u ve rapor kovası.
+/// Google Play bağlama: rapor kovası, Google girişi ya da servis hesabı.
 Future<void> showPlaySettings(BuildContext context, AppState state) =>
     _show(context, _PlaySettings(state: state));
 
@@ -151,6 +151,7 @@ class _PlaySettingsState extends State<_PlaySettings> {
   String? _json;
   String? _label;
   bool _busy = false;
+  bool _google = false;
   String? _error;
 
   @override
@@ -182,13 +183,20 @@ class _PlaySettingsState extends State<_PlaySettings> {
     });
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool google = false}) async {
     setState(() {
       _busy = true;
+      _google = google;
       _error = null;
     });
     try {
-      await _app.connectPlay(json: _json, bucket: _bucket.text);
+      if (google) {
+        await _app
+            .connectPlayWithGoogle(bucket: _bucket.text)
+            .timeout(const Duration(minutes: 5));
+      } else {
+        await _app.connectPlay(json: _json, bucket: _bucket.text);
+      }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -200,20 +208,44 @@ class _PlaySettingsState extends State<_PlaySettings> {
   @override
   Widget build(BuildContext context) {
     final connected = _app.play != null;
+    final viaGoogle = connected && _app.play!.email == null;
     return _Frame(
       title: 'Google Play',
       busy: _busy,
       error: _error,
       help:
-          'Kova: Play Console > Raporları indir > İstatistikler > '
-          '"Cloud Storage URI\'sini kopyala" (gs://pubsite_prod_...). '
-          'Servis hesabına Kullanıcılar ve izinler\'den "Uygulama bilgilerini '
-          'görüntüleme ve toplu raporları indirme" izni verin.',
+          'Cloud Storage URI: Play Console > Raporları indir > İstatistikler '
+          '> "Cloud Storage URI\'sini kopyala" ile alıp olduğu gibi yapıştırın '
+          '(gs://pubsite_prod_... ile başlar; tarayıcı adres çubuğundaki '
+          'play.google.com bağlantısı değil). '
+          'Sonra Play Console\'a erişimi olan hesapla Google ile giriş yapın. '
+          'Gelir için hesabın "Finansal verileri görüntüleme" izni olmalı.',
       fields: [
+        _Field('Cloud Storage URI (gs://pubsite_prod_...)', _bucket),
+        if (_busy && _google)
+          const Text(
+            'Tarayıcıda Google girişini tamamlayın…',
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
+          )
+        else
+          OutlinedButton.icon(
+            onPressed: _busy ? null : () => _save(google: true),
+            icon: const Icon(Icons.login, size: 16),
+            label: Text(
+              viaGoogle
+                  ? 'Google ile bağlı · yeniden giriş'
+                  : 'Google ile giriş',
+            ),
+          ),
+        const Text(
+          'ya da servis hesabı JSON\'u (hesaba Play Console\'da "Uygulama '
+          'bilgilerini görüntüleme ve toplu raporları indirme" izni verin):',
+          style: TextStyle(fontSize: 11, color: AppColors.muted, height: 1.4),
+        ),
         _FileRow(
           label:
               _label ??
-              (connected
+              (connected && !viaGoogle
                   ? 'Kayıtlı anahtar (${_app.play!.email})'
                   : 'Servis hesabı JSON dosyası seçin'),
           onPick: _busy ? null : _pick,
@@ -226,7 +258,6 @@ class _PlaySettingsState extends State<_PlaySettings> {
               child: const Text('GA4 anahtarını kullan'),
             ),
           ),
-        _Field('Kova (gs://pubsite_prod_...)', _bucket),
       ],
       onSave: _busy || (_json == null && !connected) ? null : _save,
       onDisconnect: connected && !_busy

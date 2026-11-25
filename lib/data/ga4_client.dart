@@ -104,7 +104,7 @@ class Ga4Client {
           },
         };
 
-  /// Mülkün özel boyut ve ölçüleri (oyun boyutunu seçmek için).
+  /// Mülkün özel boyut ve ölçüleri (kırılım boyutunu seçmek için).
   Future<Ga4Metadata> metadata(String propertyId) async {
     final body = await _get(
       Uri.parse('$_data/properties/$propertyId/metadata'),

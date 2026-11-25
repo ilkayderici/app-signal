@@ -23,7 +23,7 @@
 - Pencere masaüstünde açık kalır, rakamlar kendiliğinden yenilenir.
 - Veriler Google ve Apple'dan doğrudan bilgisayarınıza gelir. App Signal'in sunucusu yoktur.
 - Mağaza gelirini dolara çevirmek için döviz kurları günde birkaç kez [open.er-api.com](https://open.er-api.com)'dan alınır. Bu istekte sizinle ilgili hiçbir veri gönderilmez.
-- Google erişimi yalnız okuma iznidir (`analytics.readonly`, `admob.readonly`).
+- Google erişimi yalnız okuma içindir (`analytics.readonly`, `admob.readonly`, `devstorage.read_only`). Play kurulum, gelir ve yorumları Play Console'un rapor deposundan okunur; yorumlar günde bir güncellenir.
 - Anahtarlar ve giriş jetonları yalnız işletim sisteminin şifre kasasında saklanır.
 
 ## Kaynaklar
@@ -33,7 +33,7 @@
 | Google Analytics 4 | Google ile giriş ya da servis hesabı JSON'u |
 | AdMob | Google ile giriş |
 | App Store Connect | API anahtarı (`.p8`), Key ID, Issuer ID |
-| Google Play | Servis hesabı JSON'u |
+| Google Play | Rapor kovası + Google ile giriş ya da servis hesabı JSON'u |
 
 Bir kaynağı Ayarlar'dan istediğiniz an ayırabilirsiniz.
 
@@ -48,7 +48,7 @@ flutter run -d macos
 
 **Google ile giriş** için kendi OAuth istemcinizi ekleyin:
 
-1. Google Cloud'da Analytics Data API, Analytics Admin API ve AdMob API'yi açın.
+1. Google Cloud'da Analytics Data API, Analytics Admin API, AdMob API ve Cloud Storage API'yi açın.
 2. Kimlik bilgileri bölümünde "Masaüstü uygulaması" türünde OAuth istemcisi oluşturun.
 3. JSON'u indirip `assets/admob_oauth_client.json` olarak kaydedin. Bu dosya `.gitignore`'da; repoya girmez.
 
@@ -69,7 +69,7 @@ A small desktop window for app developers. It shows your own numbers from Google
 - Active users, downloads, reviews and ad revenue in one window.
 - Data goes straight from Google and Apple to your computer. App Signal has no server.
 - To convert store revenue to USD, exchange rates are fetched from [open.er-api.com](https://open.er-api.com) a few times a day. That request sends no data about you.
-- Google access is read-only. Keys and tokens are stored only in the OS keychain.
+- Google access is read-only (`analytics.readonly`, `admob.readonly`, `devstorage.read_only`). Play installs, revenue and reviews come from Play Console's report bucket; reviews update once a day. Keys and tokens are stored only in the OS keychain.
 
 **Build:** `flutter pub get && flutter run -d macos`. For Google sign-in, create a Desktop OAuth client in Google Cloud and save its JSON as `assets/admob_oauth_client.json` (gitignored).
 

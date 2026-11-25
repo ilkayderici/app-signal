@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/app_state.dart';
+import '../data/updater.dart';
 import 'ga4_settings.dart';
 import 'logos.dart';
 import 'setup_wizard.dart';
@@ -66,7 +69,9 @@ Future<void> showSettings(BuildContext context, AppState state) {
                 error: state.admobError,
                 onTap: () => showAdmobSettings(context, state),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
+              const _VersionRow(),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   TextButton.icon(
@@ -87,6 +92,44 @@ Future<void> showSettings(BuildContext context, AppState state) {
       ),
     ),
   );
+}
+
+/// Kurulu sürüm ve elle güncelleme denetimi.
+class _VersionRow extends StatelessWidget {
+  const _VersionRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        FutureBuilder(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snap) => Text(
+            snap.data == null
+                ? 'Sürüm'
+                : 'Sürüm ${snap.data!.version} (${snap.data!.buildNumber})',
+            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+        ),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: () {
+            if (kDebugMode) {
+              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                const SnackBar(
+                  content: Text('Debug derlemede güncelleme denetimi kapalı.'),
+                ),
+              );
+              return;
+            }
+            Updater.checkNow();
+          },
+          icon: const Icon(Icons.system_update_alt, size: 16),
+          label: const Text('Güncellemeleri denetle'),
+        ),
+      ],
+    );
+  }
 }
 
 class _Row extends StatelessWidget {

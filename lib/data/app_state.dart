@@ -15,7 +15,7 @@ import 'play_client.dart';
 import 'secret_store.dart';
 import 'store_series.dart';
 
-/// GA4 ayarları: hangi mülk, oyunlar hangi boyutta, süre ve gelir hangi
+/// GA4 ayarları: hangi mülk, kırılım hangi boyutta, süre ve gelir hangi
 /// ölçüde. Gizli değil; tercih dosyasında durur.
 class Ga4Settings {
   const Ga4Settings({
@@ -33,7 +33,7 @@ class Ga4Settings {
   final String? durationMetric;
   final String? revenueMetric;
 
-  /// Panelde gösterilecek en çok oyun sayısı; 0 hepsi demek.
+  /// Panelde gösterilecek en çok satır sayısı; 0 hepsi demek.
   final int gameLimit;
 
   static Ga4Settings? load(SharedPreferences p) {
@@ -119,7 +119,7 @@ class Ga4Snapshot {
   final Retention? retention;
 }
 
-/// Yeni oyuncuların ertesi gün (D1), 7. gün (D7) ve 30. gün (D30) dönme
+/// Yeni kullanıcıların ertesi gün (D1), 7. gün (D7) ve 30. gün (D30) dönme
 /// oranı, 0-1. Yalnız o günü tamamlanmış kohortların ağırlıklı ortalaması.
 class Retention {
   const Retention({
@@ -135,7 +135,7 @@ class Retention {
   final double? d7;
   final double? d30;
 
-  /// Ortalamaya giren yeni oyuncu sayısı.
+  /// Ortalamaya giren yeni kullanıcı sayısı.
   final int d1Users;
   final int d7Users;
   final int d30Users;
@@ -152,7 +152,7 @@ class AppEntry {
     this.ga4StreamIds = const [],
   });
 
-  /// Paket / bundle kimliği (com.ornek.oyun).
+  /// Paket / bundle kimliği (com.ornek.uygulama).
   final String id;
   final String name;
   final String? appleId;
@@ -184,6 +184,12 @@ class AppState extends ChangeNotifier {
 
   static Future<AppState> create() async {
     final s = AppState._(await SharedPreferences.getInstance());
+    // Yalnız debug derlemede: ilk açılışı denemek için her şeyi siler.
+    if (kDebugMode && const bool.fromEnvironment('APP_SIGNAL_RESET')) {
+      await s._prefs.clear();
+      await s._secrets.deleteAll();
+      debugPrint('APP_SIGNAL_RESET: ayarlar ve anahtarlar silindi');
+    }
     s.ga4Settings = Ga4Settings.load(s._prefs);
     s.selectedAppId = s._prefs.getString('app.selected');
     if (demoMode) {
@@ -328,10 +334,17 @@ class AppState extends ChangeNotifier {
       }
     }
     final playJson = await _secrets.read(SecretStore.playKey);
+    final playToken = await _secrets.read(SecretStore.playRefreshKey);
     final bucket = pref('play.bucket');
-    if (playJson != null && bucket != null) {
+    if ((playToken != null || playJson != null) && bucket != null) {
       try {
-        play = await PlayClient.connect(playJson, bucket);
+        play = playToken != null
+            ? PlayClient.fromToken(
+                AdmobClient.clientId(await AdmobClient.builtInClient()),
+                playToken,
+                bucket,
+              )
+            : await PlayClient.connect(playJson!, bucket);
       } catch (e) {
         playError = 'Google Play: $e';
       }
@@ -410,13 +423,46 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Play kovasını dener; çalışırsa kaydeder. [json] null ise kayıtlı anahtar.
+  /// Play kovasını dener; çalışırsa kaydeder. [json] null ise kayıtlı
+  /// bağlantı (Google girişi ya da servis hesabı) yeni kovayla denenir.
   Future<void> connectPlay({String? json, required String bucket}) async {
+    final token = json == null
+        ? await _secrets.read(SecretStore.playRefreshKey)
+        : null;
     final key = json ?? await _secrets.read(SecretStore.playKey);
-    if (key == null) {
-      throw const StoreException('Servis hesabı JSON dosyasını seçin.');
+    if (token == null && key == null) {
+      throw const StoreException(
+        'Google ile giriş yapın ya da servis hesabı JSON dosyasını seçin.',
+      );
     }
-    final client = await PlayClient.connect(key, bucket);
+    final client = token != null
+        ? PlayClient.fromToken(
+            AdmobClient.clientId(await AdmobClient.builtInClient()),
+            token,
+            bucket,
+          )
+        : await PlayClient.connect(key!, bucket);
+    await _usePlay(client);
+    if (token == null) {
+      await _secrets.write(SecretStore.playKey, key!);
+      await _secrets.delete(SecretStore.playRefreshKey);
+    }
+  }
+
+  /// Tarayıcıda Google girişi; Play'e kullanıcının kendi erişimiyle bağlanır.
+  Future<void> connectPlayWithGoogle({required String bucket}) async {
+    PlayClient.checkBucket(bucket);
+    final json = await AdmobClient.builtInClient();
+    final token = await AdmobClient.signIn(json, scopes: PlayClient.scopes);
+    await _usePlay(
+      PlayClient.fromToken(AdmobClient.clientId(json), token, bucket),
+    );
+    await _secrets.write(SecretStore.playRefreshKey, token);
+    await _secrets.delete(SecretStore.playKey);
+  }
+
+  /// Kurulum verisini çekerek dener; çalışırsa bağlantıyı devreye alır.
+  Future<void> _usePlay(PlayClient client) async {
     final StoreSeries data;
     try {
       data = await client.series();
@@ -424,7 +470,6 @@ class AppState extends ChangeNotifier {
       client.close();
       rethrow;
     }
-    await _secrets.write(SecretStore.playKey, key);
     await _prefs.setString('play.bucket', client.bucket);
     play?.close();
     play = client;
@@ -479,6 +524,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> disconnectPlay() async {
     await _secrets.delete(SecretStore.playKey);
+    await _secrets.delete(SecretStore.playRefreshKey);
     await _prefs.remove('play.bucket');
     play?.close();
     play = null;

@@ -16,7 +16,10 @@ import 'edge_dock.dart';
 import 'logos.dart';
 import 'theme.dart';
 
-/// Ana pencere: üst çubuk, veri kartları ve bugünkü oyun listesi.
+/// Kurulum sihirbazı bu oturumda kendiliğinden açıldı mı.
+bool _wizardShown = false;
+
+/// Ana pencere: üst çubuk, veri kartları ve bugünkü kırılım tablosu.
 class Dashboard extends StatelessWidget {
   const Dashboard({super.key, required this.state});
 
@@ -36,8 +39,16 @@ class Dashboard extends StatelessWidget {
             void openPlay() => showPlaySettings(context, state);
             void openAdmob() => showAdmobSettings(context, state);
             final data = state.ga4Data;
-            final revenue = state.admobData ?? data?.revenue;
+            // Gelir kartı yalnız AdMob raporundan; GA4 tahmini kullanılmaz.
+            final revenue = state.admobData;
             _hideMoney = state.hideMoney;
+            // İlk açılışta sihirbaz kendiliğinden gelir; oturumda bir kez.
+            if (state.needsSetup && !_wizardShown) {
+              _wizardShown = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (context.mounted) showSetupWizard(context, state);
+              });
+            }
             final storeMoney =
                 (state.appStoreData?.hasRevenue ?? false) ||
                 (state.playData?.hasRevenue ?? false);
@@ -78,10 +89,6 @@ class Dashboard extends StatelessWidget {
                           _ErrorBox(msg, onTap: tap),
                           const SizedBox(height: 10),
                         ],
-                      for (final d in state.drops) ...[
-                        _DropBox(d, hideMoney: state.hideMoney),
-                        const SizedBox(height: 10),
-                      ],
                       Row(
                         children: [
                           Expanded(
@@ -161,19 +168,6 @@ class Dashboard extends StatelessWidget {
                           play: state.playData,
                         ),
                       ],
-                      if (state.insights.isNotEmpty) ...[
-                        const SizedBox(height: 18),
-                        const _SectionTitle('BUGÜN BAKMAN GEREKEN'),
-                        const SizedBox(height: 8),
-                        for (final i in state.insights) ...[
-                          _InsightTile(i),
-                          const SizedBox(height: 8),
-                        ],
-                      ],
-                      if (state.lowReviews.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        _LowReviews(state),
-                      ],
                       if (data?.retention != null) ...[
                         const SizedBox(height: 10),
                         _RetentionCard(
@@ -181,21 +175,21 @@ class Dashboard extends StatelessWidget {
                           newToday: data.newToday,
                         ),
                       ],
-                      // Oyun kırılımı isteğe bağlı: GA4 bağlı ama boyut
+                      // Kırılım tablosu isteğe bağlı: GA4 bağlı ama boyut
                       // seçilmemişse bölüm hiç gösterilmez.
                       if (!state.restoring && !state.ga4Ready ||
                           state.ga4Settings?.gameDimension != null) ...[
                         const SizedBox(height: 18),
-                        const _SectionTitle('OYUNLAR · BUGÜN'),
+                        const _SectionTitle('KIRILIM · BUGÜN'),
                         const SizedBox(height: 8),
                         if (data == null)
                           _Placeholder(
-                            'GA4 bağlanınca her oyunun oyuncu sayısı, '
-                            'süresi ve geliri burada görünür.',
+                            'GA4 bağlanınca seçtiğiniz boyutta her satırın kullanıcı '
+                            'sayısı, süresi ve geliri burada görünür.',
                             onTap: openGa4,
                           )
                         else if (data.games.isEmpty)
-                          const _Placeholder('Bugün henüz oyun verisi yok.')
+                          const _Placeholder('Bugün henüz veri yok.')
                         else
                           _GamesTable(
                             data.games,
@@ -291,6 +285,7 @@ class _TopBarState extends State<_TopBar> {
                 ),
               ),
             if (s.apps.isEmpty) const Spacer(),
+            _BellButton(state: s),
             _BarButton(
               icon: Icons.refresh,
               tooltip: 'Yenile',
@@ -432,6 +427,113 @@ class _AppIcon extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Bildirim zili: uyarı, teşhis ve kötü yorum sayısı rozette.
+class _BellButton extends StatelessWidget {
+  const _BellButton({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final n =
+        state.drops.length +
+        state.insights.where((i) => !i.good).length +
+        state.lowReviews.length;
+    return IconButton(
+      tooltip: 'Bildirimler',
+      onPressed: () => _showNotifications(context, state),
+      iconSize: 17,
+      visualDensity: VisualDensity.compact,
+      color: n > 0 ? AppColors.signal : AppColors.muted,
+      icon: Badge(
+        isLabelVisible: n > 0,
+        label: Text('$n'),
+        child: Icon(
+          n > 0
+              ? Icons.notifications_active_outlined
+              : Icons.notifications_none,
+        ),
+      ),
+    );
+  }
+}
+
+/// Bildirim sayfası: ani değişimler, teşhisler ve kötü yorumlar. Panel yalnız
+/// rakamları gösterir; bunlar burada toplanır.
+Future<void> _showNotifications(BuildContext context, AppState state) {
+  return showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      backgroundColor: AppColors.card,
+      insetPadding: const EdgeInsets.all(14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: AppColors.cardBorder),
+      ),
+      child: ListenableBuilder(
+        listenable: state,
+        builder: (context, _) {
+          final empty =
+              state.drops.isEmpty &&
+              state.insights.isEmpty &&
+              state.lowReviews.isEmpty;
+          return ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(18),
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Bildirimler',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Kapat',
+                    iconSize: 17,
+                    visualDensity: VisualDensity.compact,
+                    color: AppColors.muted,
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              if (empty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Şu an bakılacak bir şey yok.',
+                    style: TextStyle(fontSize: 12, color: AppColors.muted),
+                  ),
+                ),
+              for (final d in state.drops) ...[
+                const SizedBox(height: 10),
+                _DropBox(d, hideMoney: state.hideMoney),
+              ],
+              if (state.insights.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const _SectionTitle('BUGÜN BAKMAN GEREKEN'),
+                for (final i in state.insights) ...[
+                  const SizedBox(height: 8),
+                  _InsightTile(i),
+                ],
+              ],
+              if (state.lowReviews.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _LowReviews(state),
+              ],
+            ],
+          );
+        },
+      ),
+    ),
+  );
 }
 
 class _BarButton extends StatelessWidget {
@@ -649,8 +751,7 @@ class _ActiveCard extends StatelessWidget {
   }
 }
 
-/// Bugünkü toplam gelir: AdMob bağlıysa raporundan, yoksa GA4 gelir
-/// ölçüsünden (tahmini).
+/// Bugünkü reklam geliri, AdMob raporundan.
 class _RevenueCard extends StatelessWidget {
   const _RevenueCard(this.r, {this.appStoreSubs, this.playSubs, this.onTap});
 
@@ -680,7 +781,10 @@ class _RevenueCard extends StatelessWidget {
       ),
       footer: Row(
         children: [
-          sourceLabel('AdMob', AppColors.ga4),
+          sourceLabel(
+            r.real ? 'AdMob' : 'GA4',
+            r.real ? AppColors.admob : AppColors.ga4,
+          ),
           const SizedBox(width: 6),
           Text(
             'Dün ${_money(r.yesterday, r.currency)}',
@@ -715,7 +819,7 @@ class _LogoNote extends StatelessWidget {
   );
 }
 
-/// Yeni oyuncuların D1, D7 ve D30 dönme oranı (GA4 kohort raporu).
+/// Yeni kullanıcıların D1, D7 ve D30 dönme oranı (GA4 kohort raporu).
 class _RetentionCard extends StatelessWidget {
   const _RetentionCard(this.r, {required this.newToday});
 
@@ -727,7 +831,7 @@ class _RetentionCard extends StatelessWidget {
     String pct(double? v) => v == null ? '—' : '%${(v * 100).round()}';
     Widget cell(String label, double? v, int users) => Expanded(
       child: Tooltip(
-        message: '$users yeni oyuncu üzerinden',
+        message: '$users yeni kullanıcı üzerinden',
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
@@ -747,7 +851,7 @@ class _RetentionCard extends StatelessWidget {
     );
     return _Card(
       icon: Icons.replay,
-      title: 'TUTUNMA · YENİ OYUNCU',
+      title: 'TUTUNMA · YENİ KULLANICI',
       color: AppColors.ga4,
       body: Row(
         children: [
@@ -917,7 +1021,7 @@ class _GamesTable extends StatelessWidget {
 
   final List<GameRow> games;
 
-  /// En çok kaç oyun gösterilir; 0 hepsi.
+  /// En çok kaç satır gösterilir; 0 hepsi.
   final int limit;
 
   @override
@@ -969,7 +1073,7 @@ class _GamesTable extends StatelessWidget {
       child: Column(
         children: [
           row(
-            'OYUN',
+            'AD',
             'KİŞİ',
             showTime ? 'SÜRE' : null,
             showRev ? 'GELİR' : null,
@@ -990,7 +1094,7 @@ class _GamesTable extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 2),
               child: Text(
-                '+${games.length - limit} oyun daha',
+                '+${games.length - limit} satır daha',
                 style: const TextStyle(fontSize: 11, color: AppColors.muted),
               ),
             ),
@@ -1026,7 +1130,7 @@ class _ErrorBox extends StatelessWidget {
   }
 }
 
-/// Son 7 günün 1-2 yıldızlı yorumları (en yeni 3 tanesi).
+/// Son 7 günün 1-2 yıldızlı yorumları.
 class _LowReviews extends StatelessWidget {
   const _LowReviews(this.state);
 
@@ -1042,7 +1146,7 @@ class _LowReviews extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionTitle('KÖTÜ YORUMLAR · 7 GÜN · ${all.length}'),
-          for (final r in all.take(3)) ...[
+          for (final r in all) ...[
             const SizedBox(height: 10),
             Row(
               children: [
@@ -1132,7 +1236,7 @@ class _StoreRevenueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget cell(String source, Color color, StoreSeries? d) {
+    Widget cell(StoreSeries? d) {
       final last = d?.last;
       final known = d != null && d.hasRevenue;
       return Expanded(
@@ -1141,6 +1245,8 @@ class _StoreRevenueCard extends StatelessWidget {
           children: [
             Text(
               known && last?.revenue != null ? _money(last!.revenue!) : '—',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 2),
@@ -1148,10 +1254,10 @@ class _StoreRevenueCard extends StatelessWidget {
               known
                   ? '${last!.short} · 7g ${_money(d.weekRevenue ?? 0)}'
                   : 'izin yok',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, color: AppColors.muted),
             ),
-            const Spacer(),
-            sourceLabel(source, color),
           ],
         ),
       );
@@ -1162,20 +1268,20 @@ class _StoreRevenueCard extends StatelessWidget {
       title: 'MAĞAZA GELİRİ · NET',
       color: AppColors.appStore,
       body: Row(
-        children: [
-          cell('App Store', AppColors.appStore, appStore),
-          const SizedBox(width: 12),
-          cell('Google Play', AppColors.play, play),
-        ],
+        children: [cell(appStore), const SizedBox(width: 12), cell(play)],
       ),
-      footer: const Tooltip(
-        message:
-            'App Store: raporlanan net gelir. Google Play: vergisiz fiyatın '
-            '%85\'i (tahmini). Kurlar open.er-api.com\'dan.',
-        child: Text(
-          'USD · Play tahmini',
-          style: TextStyle(fontSize: 11, color: AppColors.muted),
-        ),
+      footer: Row(
+        children: [
+          Expanded(child: sourceLabel('App Store', AppColors.appStore)),
+          const SizedBox(width: 12),
+          Expanded(child: sourceLabel('Google Play', AppColors.play)),
+          const Tooltip(
+            message:
+                'USD. App Store: raporlanan net gelir. Google Play: vergisiz '
+                'fiyatın %85\'i (tahmini). Kurlar open.er-api.com\'dan.',
+            child: Icon(Icons.info_outline, size: 14, color: AppColors.muted),
+          ),
+        ],
       ),
     );
   }

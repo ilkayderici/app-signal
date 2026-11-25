@@ -83,7 +83,7 @@ class _AppSignalState extends State<AppSignal> with TrayListener {
 
   String? _title;
 
-  /// Menü çubuğunda simgenin yanında canlı oyuncu (son 30 dk). Düşüş ya da
+  /// Menü çubuğunda simgenin yanında canlı kullanıcı (son 30 dk). Düşüş ya da
   /// kötü yorum varsa yanına uyarı işareti.
   void _updateTitle() {
     if (!Platform.isMacOS) return;

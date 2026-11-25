@@ -6,7 +6,7 @@ Uygulama günde bir kez şu adrese bakar:
 - macOS: `https://github.com/ilkayderici/app-signal/releases/latest/download/appcast.xml`
 - Windows: `https://github.com/ilkayderici/app-signal/releases/latest/download/appcast-windows.xml`
 
-Menüdeki "Güncellemeleri denetle" aynı denetimi elle yapar. Debug derlemede denetim kapalıdır.
+Ayarlar'daki "Güncellemeleri denetle" aynı denetimi elle yapar; sürüm numarası da orada görünür. Debug derlemede denetim kapalıdır.
 
 ## İmza anahtarı
 

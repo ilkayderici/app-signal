@@ -17,6 +17,7 @@ class SecretStore {
   static const admobClientKey = 'admob_oauth_client';
   static const admobRefreshKey = 'admob_refresh_token';
   static const ga4RefreshKey = 'ga4_refresh_token';
+  static const playRefreshKey = 'play_refresh_token';
 
   Future<String?> read(String key) => _storage.read(key: key);
 
@@ -24,6 +25,8 @@ class SecretStore {
       _storage.write(key: key, value: value);
 
   Future<void> delete(String key) => _storage.delete(key: key);
+
+  Future<void> deleteAll() => _storage.deleteAll();
 
   /// Eski (ad-hoc imzalı) derlemenin yazdığı kayıtlara her okumada izin
   /// sorulur. Bir kez silip yeniden yazınca kayıt bu imzaya geçer; geliştirici

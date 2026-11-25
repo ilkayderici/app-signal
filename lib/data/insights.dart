@@ -30,15 +30,19 @@ List<Insight> diagnose(AppState s, {int max = 4}) {
   final prev = prevs.contains(null) || prevs.isEmpty
       ? null
       : prevs.fold(0, (a, b) => a + b!);
-  final withRevenue = [for (final e in stores) if (e.$2.hasRevenue) e.$2];
+  final withRevenue = [
+    for (final e in stores)
+      if (e.$2.hasRevenue) e.$2,
+  ];
   final revenue = withRevenue.isEmpty
       ? null
       : withRevenue.fold<double>(0, (a, d) => a + (d.weekRevenue ?? 0));
-  final revenuePrev = withRevenue.isEmpty ||
-          withRevenue.any((d) => d.prevWeekRevenue == null)
+  final revenuePrev =
+      withRevenue.isEmpty || withRevenue.any((d) => d.prevWeekRevenue == null)
       ? null
       : withRevenue.fold<double>(0, (a, d) => a + d.prevWeekRevenue!);
-  final fullWeek = stores.isNotEmpty && stores.every((e) => e.$2.days.length >= 7);
+  final fullWeek =
+      stores.isNotEmpty && stores.every((e) => e.$2.days.length >= 7);
 
   // Kurulum var, gelir yok.
   final ads = s.admobData?.month ?? 0;
@@ -146,8 +150,7 @@ List<Insight> diagnose(AppState s, {int max = 4}) {
           InsightKind.good,
           'Kurulumlar geçen haftaya göre ${pct(change)} arttı',
           why: 'Bu hafta $week, geçen hafta $prev kurulum.',
-          todo:
-              'Neyin işe yaradığını bul (ülke, kaynak, sürüm) ve onu büyüt.',
+          todo: 'Neyin işe yaradığını bul (ülke, kaynak, sürüm) ve onu büyüt.',
         ),
       );
     }
@@ -207,9 +210,10 @@ List<Insight> diagnose(AppState s, {int max = 4}) {
       ),
     );
   }
-  final ratings = [?s.appStoreRating, ?s.playRating]
-      .where((r) => r.average != null)
-      .toList();
+  final ratings = [
+    ?s.appStoreRating,
+    ?s.playRating,
+  ].where((r) => r.average != null).toList();
   final count = ratings.fold(0, (a, r) => a + r.count);
   if (count > 0) {
     final avg =
@@ -256,8 +260,8 @@ List<Insight> diagnose(AppState s, {int max = 4}) {
           todo: name == 'App Store'
               ? 'Anahtarın rolünü (Admin, Finance ya da Sales) ve satıcı '
                     'numarasını Ayarlar\'da kontrol et.'
-              : 'Servis hesabının toplu rapor iznini Play Console\'da kontrol '
-                    'et.',
+              : 'Bağlı hesabın Play Console\'daki "Uygulama bilgilerini '
+                    'görüntüleme ve toplu raporları indirme" iznini kontrol et.',
         ),
       );
     }
