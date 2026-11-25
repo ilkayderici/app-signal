@@ -57,6 +57,14 @@ IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
+// WinSparkle: güncellemelerin EdDSA imzasını doğrulayan açık anahtar
+//
+
+EdDSAPub                EDDSA                   {"xbpWRscxgv5NFh/9HNIqhZUigLLhBnuBh8PK7skiqZU="}
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
 // Version
 //
 

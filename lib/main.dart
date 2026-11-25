@@ -5,6 +5,7 @@ import 'package:tray_manager/legacy.dart';
 import 'package:window_manager/legacy.dart';
 
 import 'data/app_state.dart';
+import 'data/updater.dart';
 import 'ui/dashboard.dart';
 import 'ui/edge_dock.dart';
 import 'ui/theme.dart';
@@ -32,6 +33,7 @@ Future<void> main() async {
   await _setUpTray();
   final state = await AppState.create();
   runApp(AppSignal(state: state));
+  Updater.start();
 }
 
 /// Menü çubuğu (Mac) ya da saat yanı (Windows) simgesi. Tıklayınca pencere
@@ -47,6 +49,7 @@ Future<void> _setUpTray() async {
       items: [
         MenuItem(key: 'toggle', label: 'Göster / Gizle'),
         MenuItem(key: 'refresh', label: 'Yenile'),
+        MenuItem(key: 'update', label: 'Güncellemeleri denetle'),
         MenuItem.separator(),
         MenuItem(key: 'quit', label: 'Çık'),
       ],
@@ -108,6 +111,8 @@ class _AppSignalState extends State<AppSignal> with TrayListener {
         _toggleWindow();
       case 'refresh':
         widget.state.refresh(force: true);
+      case 'update':
+        Updater.checkNow();
       case 'quit':
         trayManager.destroy();
         exit(0);
