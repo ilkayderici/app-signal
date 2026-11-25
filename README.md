@@ -26,6 +26,18 @@
 - Google erişimi yalnız okuma içindir (`analytics.readonly`, `admob.readonly`, `devstorage.read_only`). Play kurulum, gelir ve yorumları Play Console'un rapor deposundan okunur; yorumlar günde bir güncellenir.
 - Anahtarlar ve giriş jetonları yalnız işletim sisteminin şifre kasasında saklanır.
 
+## Pencere nasıl açılır, nasıl gizlenir
+
+Pencere ekranın sağ üstünde, ekran yüksekliğince durur. Bir köşede hep açık kalmaz; gerektiğinde gelir.
+
+- **Sağ kenardan çağırma:** İmleci ekranın sağ kenarına, pencerenin durduğu üst bölüme götürüp çeyrek saniye bekletin. Pencere sağdan kayarak gelir.
+- **Kendiliğinden gizlenme:** Kenardan açılan pencere, imleç pencereden çıktıktan yaklaşık 0,7 saniye sonra sağa kayıp gizlenir. Açık bir ayar ya da bildirim penceresi varken gizlenmez.
+- **Başka pencerelerin arkasında kaldıysa:** Aynı kenar hareketi onu öne getirir.
+- **Menü çubuğu simgesi:** Tıklayınca pencere gelir ve siz kapatana kadar açık kalır. Önde iken tıklamak gizler. Sağ tıkta Yenile, Güncellemeleri denetle ve Çık var.
+- Simgenin yanında son 30 dakikadaki canlı kullanıcı sayısı görünür; düşüş ya da kötü yorum varsa yanında ⚠ çıkar.
+
+Kenar hareketi yalnız macOS'ta var. Windows'ta pencere sistem tepsisi simgesinden açılıp kapanır.
+
 ## Kaynaklar
 
 | Kaynak | Bağlantı |
@@ -33,7 +45,7 @@
 | Google Analytics 4 | Google ile giriş ya da servis hesabı JSON'u |
 | AdMob | Google ile giriş |
 | App Store Connect | API anahtarı (`.p8`), Key ID, Issuer ID |
-| Google Play | Rapor kovası + Google ile giriş ya da servis hesabı JSON'u |
+| Google Play | Cloud Storage URI + Google ile giriş ya da servis hesabı JSON'u |
 
 Bir kaynağı Ayarlar'dan istediğiniz an ayırabilirsiniz.
 
@@ -70,6 +82,7 @@ A small desktop window for app developers. It shows your own numbers from Google
 - Data goes straight from Google and Apple to your computer. App Signal has no server.
 - To convert store revenue to USD, exchange rates are fetched from [open.er-api.com](https://open.er-api.com) a few times a day. That request sends no data about you.
 - Google access is read-only (`analytics.readonly`, `admob.readonly`, `devstorage.read_only`). Play installs, revenue and reviews come from Play Console's report bucket; reviews update once a day. Keys and tokens are stored only in the OS keychain.
+- The window sits at the top right of the screen and slides out of view. On macOS, rest the cursor on the right screen edge (top part) for a quarter second and it slides in; it slides back out about 0.7 s after the cursor leaves it. Clicking the menu bar icon opens it and keeps it open until you click again.
 
 **Build:** `flutter pub get && flutter run -d macos`. For Google sign-in, create a Desktop OAuth client in Google Cloud and save its JSON as `assets/admob_oauth_client.json` (gitignored).
 
