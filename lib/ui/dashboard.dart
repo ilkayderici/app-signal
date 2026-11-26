@@ -775,9 +775,26 @@ class _RevenueCard extends StatelessWidget {
             'Abone: App Store ${appStoreSubs ?? '—'} · '
                 'Google Play ${playSubs ?? '—'}',
         ].join('\n'),
-        child: Text(
-          _money(r.today, r.currency),
-          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _money(r.today, r.currency),
+              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: SizedBox(
+                  height: 30,
+                  child: CustomPaint(
+                    painter: _Sparkline(r.daily, color: AppColors.admob),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       footer: Row(
@@ -908,6 +925,8 @@ class _InstallCard extends StatelessWidget {
     }
     final s = summary;
     final delDate = s?.deletesDate;
+    final all = d.values;
+    final spark = all.length > 14 ? all.sublist(all.length - 14) : all;
     // Sağ sütunda küçük satır: "+4 bugün", "−2 silme".
     Widget line(String sign, int? v, String label, Color c, String tip) =>
         Tooltip(
@@ -942,23 +961,33 @@ class _InstallCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: Tooltip(
-              message: s?.total == null
-                  ? 'Toplam kurulum okunamadı.'
-                  : 'Yayından bu yana mağaza raporlarındaki toplam kurulum.',
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    _n(s?.total),
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Tooltip(
+                  message: s?.total == null ? 'Toplam kurulum okunamadı.' : 'Yayından bu yana mağaza raporlarındaki toplam kurulum.',
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _n(s?.total),
+                      style: const TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 2),
+                // Son 14 raporlu günün kurulumu.
+                Expanded(
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _Sparkline(spark, color: color),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 8),
@@ -1021,15 +1050,15 @@ class _InstallCard extends StatelessWidget {
 }
 
 class _Sparkline extends CustomPainter {
-  _Sparkline(this.values);
+  _Sparkline(this.values, {this.color = AppColors.ga4});
 
-  final List<int> values;
-  final Color color = AppColors.ga4;
+  final List<num> values;
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (values.length < 2) return;
-    final top = values.reduce(math.max).toDouble();
+    final top = values.fold<num>(0, math.max).toDouble();
     if (top == 0) return;
     final dx = size.width / (values.length - 1);
     final path = Path();
@@ -1074,7 +1103,8 @@ class _Sparkline extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_Sparkline old) => old.values != values;
+  bool shouldRepaint(_Sparkline old) =>
+      old.values != values || old.color != color;
 }
 
 class _GamesTable extends StatelessWidget {

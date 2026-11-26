@@ -82,6 +82,10 @@ void fillDemo(AppState s) {
     yesterday: 18.92,
     month: 402.15,
     real: true,
+    daily: [
+      14.2, 16.8, 12.9, 19.4, 17.1, 15.6, 21.3, //
+      18.7, 16.2, 22.5, 20.1, 17.9, 18.92, 11.37,
+    ],
   );
   Map<String, double> money(List<double> v) => {
     for (var i = 0; i < v.length; i++) day(v.length + 1 - i): v[i],

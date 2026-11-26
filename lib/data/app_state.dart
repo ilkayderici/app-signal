@@ -176,12 +176,16 @@ class RevenueSummary {
     required this.month,
     this.currency = 'USD',
     this.real = false,
+    this.daily = const [],
   });
 
   final double today;
   final double yesterday;
   final double month;
   final String currency;
+
+  /// Son 14 günün günlük geliri, eskiden yeniye (bugün dahil).
+  final List<double> daily;
 
   /// AdMob raporundan (gerçek); false ise GA4 gelir ölçüsünden (tahmini).
   final bool real;
@@ -526,6 +530,7 @@ class AppState extends ChangeNotifier {
               month: r.month,
               currency: admob!.currency,
               real: true,
+              daily: r.daily,
             );
       admobError = null;
     } catch (e) {
@@ -1093,8 +1098,11 @@ class AppState extends ChangeNotifier {
   ) {
     if (hourly == null && recent == null) return null;
     const hourMs = 3600000;
-    final dayStart = DateTime(now.year, now.month, now.day)
-        .millisecondsSinceEpoch;
+    final dayStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).millisecondsSinceEpoch;
     final nowMin = now.millisecondsSinceEpoch ~/ 60000;
 
     final minutes = _recentInstallMinutes.putIfAbsent(key, () => {});

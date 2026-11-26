@@ -105,11 +105,11 @@ class AdmobClient {
 
   void close() => _client.close();
 
-  /// Bugün, dün ve bu ay. [storeIds] verilirse (Apple kimliği / paket adı)
-  /// yalnız o uygulamalar; AdMob'da eşleşen yoksa null.
-  Future<({double today, double yesterday, double month})?> earnings({
-    Set<String>? storeIds,
-  }) async {
+  /// Bugün, dün, bu ay ve son 14 günün günlük geliri (eskiden yeniye,
+  /// bugün dahil). [storeIds] verilirse (Apple kimliği / paket adı) yalnız o
+  /// uygulamalar; AdMob'da eşleşen yoksa null.
+  Future<({double today, double yesterday, double month, List<double> daily})?>
+  earnings({Set<String>? storeIds}) async {
     List<String>? appIds;
     if (storeIds != null) {
       final apps = _apps ??= await _listApps();
@@ -121,9 +121,10 @@ class AdmobClient {
     }
     final now = DateTime.now();
     final yday = now.subtract(const Duration(days: 1));
-    final start = DateTime(now.year, now.month, 1).isBefore(yday)
-        ? DateTime(now.year, now.month, 1)
-        : yday;
+    // Ayın başı ya da 14 gün öncesi, hangisi daha eskiyse (grafik için).
+    final monthStart = DateTime(now.year, now.month, 1);
+    final twoWeeks = DateTime(now.year, now.month, now.day - 13);
+    final start = monthStart.isBefore(twoWeeks) ? monthStart : twoWeeks;
     Map<String, int> date(DateTime d) => {
       'year': d.year,
       'month': d.month,
@@ -168,6 +169,10 @@ class AdmobClient {
       month: byDay.entries
           .where((e) => e.key.compareTo(monthKey) >= 0)
           .fold(0.0, (a, e) => a + e.value),
+      daily: [
+        for (var i = 13; i >= 0; i--)
+          byDay[key(DateTime(now.year, now.month, now.day - i))] ?? 0,
+      ],
     );
   }
 
