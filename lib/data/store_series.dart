@@ -4,10 +4,22 @@ class StoreSeries {
   StoreSeries(Map<String, int> byDate, {Map<String, double>? revenue})
     : days = (byDate.entries.toList()..sort((a, b) => a.key.compareTo(b.key)))
           .map((e) => StoreDay(e.key, e.value, revenue?[e.key]))
-          .toList();
+          .toList(),
+      revenueDays =
+          (revenue?.entries.toList() ?? [])
+            ..sort((a, b) => a.key.compareTo(b.key));
 
   /// Eskiden yeniye; tarih yyyy-MM-dd.
   final List<StoreDay> days;
+
+  /// Gelirin bilindiği bütün günler, eskiden yeniye. Kurulum raporundan
+  /// daha ileri gidebilir (Play'de satış raporu daha güncel).
+  final List<MapEntry<String, double>> revenueDays;
+
+  /// Gelirin bilindiği en son gün; yoksa null.
+  StoreDay? get lastRevenue => revenueDays.isEmpty
+      ? null
+      : StoreDay(revenueDays.last.key, 0, revenueDays.last.value);
 
   StoreDay? get last => days.isEmpty ? null : days.last;
 
@@ -21,10 +33,21 @@ class StoreSeries {
   List<int> get values => [for (final d in days) d.count];
 
   /// Gelir okunabildi mi (rapor izni ve kur varsa).
-  bool get hasRevenue => days.any((d) => d.revenue != null);
+  bool get hasRevenue => revenueDays.isNotEmpty;
 
   /// Son 7 günün net geliri; bilinmiyorsa null.
   double? get weekRevenue => _sum(_window(0));
+
+  /// Bu ayın (yerel takvim) raporlanan günlerinin net geliri; bilinmiyorsa
+  /// null. Seri ayın başına kadar uzanmalı.
+  double? get monthRevenue {
+    final now = DateTime.now();
+    final prefix =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-';
+    final month = revenueDays.where((e) => e.key.startsWith(prefix));
+    if (revenueDays.isEmpty) return null;
+    return month.fold<double>(0, (a, e) => a + e.value);
+  }
 
   double? get prevWeekRevenue => days.length < 14 ? null : _sum(_window(7));
 
@@ -59,22 +82,64 @@ class StoreDay {
   String get short => '${date.substring(8, 10)}.${date.substring(5, 7)}';
 }
 
+/// Mağazanın toplam kurulumu ve en son raporlanan günün silme sayısı.
+class InstallSummary {
+  const InstallSummary({this.total, this.deletes, this.deletesDate, this.note});
+
+  /// Yayından bu yana toplam kurulum; okunamazsa null.
+  final int? total;
+
+  /// [deletesDate] günü silinen kurulum; okunamazsa null.
+  final int? deletes;
+
+  /// yyyy-MM-dd.
+  final String? deletesDate;
+
+  /// Silme okunamadıysa nedeni (kartta ipucu olarak gösterilir).
+  final String? note;
+
+  InstallSummary copyWith({int? total}) => InstallSummary(
+    total: total ?? this.total,
+    deletes: deletes,
+    deletesDate: deletesDate,
+    note: note,
+  );
+}
+
 /// Son 30 günde yazılan yorumların ortalama yıldızı.
 class RatingSummary {
-  const RatingSummary(this.average, this.count, {this.low = const []});
+  const RatingSummary(
+    this.average,
+    this.count, {
+    this.low = const [],
+    this.total,
+    this.totalCount,
+  });
 
-  factory RatingSummary.of(Iterable<int> stars, {List<Review> low = const []}) {
+  factory RatingSummary.of(
+    Iterable<int> stars, {
+    List<Review> low = const [],
+    double? total,
+    int? totalCount,
+  }) {
     final list = stars.toList();
-    if (list.isEmpty) return RatingSummary(null, 0, low: low);
     return RatingSummary(
-      list.reduce((a, b) => a + b) / list.length,
+      list.isEmpty ? null : list.reduce((a, b) => a + b) / list.length,
       list.length,
       low: low,
+      total: total,
+      totalCount: totalCount,
     );
   }
 
   final double? average;
   final int count;
+
+  /// Mağazadaki yayından bu yana genel puan; alınamazsa null.
+  final double? total;
+
+  /// Genel puanı veren oy sayısı; mağaza vermiyorsa null (Play vermez).
+  final int? totalCount;
 
   /// Son 7 günün 1-2 yıldızlı yorumları, yeniden eskiye.
   final List<Review> low;

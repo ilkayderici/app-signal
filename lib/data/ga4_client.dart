@@ -91,18 +91,37 @@ class Ga4Client {
     ];
   }
 
-  /// [streamIds] verilirse rapor yalnız bu akışlara süzülür.
-  static Map<String, Object> _streamFilter(List<String>? streamIds) =>
-      streamIds == null
-      ? const {}
-      : {
-          'dimensionFilter': {
-            'filter': {
-              'fieldName': 'streamId',
-              'inListFilter': {'values': streamIds},
-            },
+  /// [streamIds] verilirse rapor yalnız bu akışlara, [eventName] verilirse
+  /// yalnız o olaya süzülür.
+  static Map<String, Object> _streamFilter(
+    List<String>? streamIds, [
+    String? eventName,
+  ]) {
+    final filters = [
+      if (streamIds != null)
+        {
+          'filter': {
+            'fieldName': 'streamId',
+            'inListFilter': {'values': streamIds},
           },
-        };
+        },
+      if (eventName != null)
+        {
+          'filter': {
+            'fieldName': 'eventName',
+            'stringFilter': {'matchType': 'EXACT', 'value': eventName},
+          },
+        },
+    ];
+    if (filters.isEmpty) return const {};
+    return {
+      'dimensionFilter': filters.length == 1
+          ? filters.single
+          : {
+              'andGroup': {'expressions': filters},
+            },
+    };
+  }
 
   /// Mülkün özel boyut ve ölçüleri (kırılım boyutunu seçmek için).
   Future<Ga4Metadata> metadata(String propertyId) async {
@@ -133,11 +152,37 @@ class Ga4Client {
     String? orderByMetric,
     int limit = 50,
     List<String>? streamIds,
+    String? eventName,
+  }) async {
+    final r = await zonedReport(
+      propertyId,
+      dateRanges: dateRanges,
+      dimensions: dimensions,
+      metrics: metrics,
+      orderByMetric: orderByMetric,
+      limit: limit,
+      streamIds: streamIds,
+      eventName: eventName,
+    );
+    return r.rows;
+  }
+
+  /// [report] gibi; ek olarak mülkün saat dilimini (IANA adı, ör.
+  /// "America/Los_Angeles") döner. `date`/`dateHour` bu dilimdedir.
+  Future<({List<Map<String, String>> rows, String? timeZone})> zonedReport(
+    String propertyId, {
+    required List<Map<String, String>> dateRanges,
+    List<String> dimensions = const [],
+    required List<String> metrics,
+    String? orderByMetric,
+    int limit = 50,
+    List<String>? streamIds,
+    String? eventName,
   }) async {
     final body = await _post(
       Uri.parse('$_data/properties/$propertyId:runReport'),
       {
-        ..._streamFilter(streamIds),
+        ..._streamFilter(streamIds, eventName),
         'dateRanges': dateRanges,
         'dimensions': [
           for (final d in dimensions) {'name': d},
@@ -153,6 +198,36 @@ class Ga4Client {
             },
           ],
         'limit': limit,
+      },
+    );
+    return (
+      rows: _rows(body),
+      timeZone: (body['metadata'] as Map?)?['timeZone'] as String?,
+    );
+  }
+
+  /// Son 30 dakikadaki [eventName] olayları, dakika ve platforma göre.
+  /// Satırlar: minutesAgo, platform, eventCount.
+  Future<List<Map<String, String>>> realtimeEvents(
+    String propertyId, {
+    required String eventName,
+    List<String>? streamIds,
+  }) async {
+    final body = await _post(
+      Uri.parse('$_data/properties/$propertyId:runRealtimeReport'),
+      {
+        ..._streamFilter(streamIds, eventName),
+        'dimensions': [
+          {'name': 'minutesAgo'},
+          {'name': 'platform'},
+        ],
+        'metrics': [
+          {'name': 'eventCount'},
+        ],
+        'minuteRanges': [
+          {'startMinutesAgo': 29, 'endMinutesAgo': 0},
+        ],
+        'limit': 200,
       },
     );
     return _rows(body);

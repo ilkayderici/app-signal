@@ -143,6 +143,8 @@ class Dashboard extends StatelessWidget {
                               connected: state.appStoreOn || state.restoring,
                               missing: state.appStoreMissing,
                               data: state.appStoreData,
+                              summary: state.appStoreInstalls,
+                              today: data?.newInstalls?['ios'],
                               rating: state.appStoreRating,
                               onTap: openAppStore,
                             ),
@@ -155,6 +157,8 @@ class Dashboard extends StatelessWidget {
                               connected: state.playOn || state.restoring,
                               missing: state.playMissing,
                               data: state.playData,
+                              summary: state.playInstalls,
+                              today: data?.newInstalls?['android'],
                               rating: state.playRating,
                               onTap: openPlay,
                             ),
@@ -843,7 +847,8 @@ class _RetentionCard extends StatelessWidget {
   }
 }
 
-/// Mağaza kurulum kartı: son raporlu gün, 7 günlük toplam ve çizgi.
+/// Mağaza kurulum kartı: yayından bu yana toplam, bugünkü yeni kurulum
+/// (GA4 first_open) ve en son raporlanan günün silmesi.
 class _InstallCard extends StatelessWidget {
   const _InstallCard({
     required this.source,
@@ -852,6 +857,8 @@ class _InstallCard extends StatelessWidget {
     this.missing = false,
     required this.data,
     required this.onTap,
+    this.summary,
+    this.today,
     this.rating,
   });
 
@@ -860,13 +867,30 @@ class _InstallCard extends StatelessWidget {
   final Color color;
   final bool connected;
   final bool missing;
+
+  /// Mağaza verisi geldi mi; gelene kadar kart yükleniyor görünür.
   final StoreSeries? data;
+  final InstallSummary? summary;
+
+  /// Bugünkü yeni kurulum; GA4 bağlı değilse null.
+  final int? today;
   final VoidCallback onTap;
+
+  /// 12345 → "12.345".
+  static String _n(int? v) {
+    if (v == null) return '—';
+    final s = v.abs().toString();
+    final b = StringBuffer(v < 0 ? '-' : '');
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) b.write('.');
+      b.write(s[i]);
+    }
+    return b.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
     final d = data;
-    final last = d?.last;
     if (!connected || missing || d == null) {
       return _SourceCard(
         icon: Icons.download_outlined,
@@ -882,26 +906,90 @@ class _InstallCard extends StatelessWidget {
         onTap: onTap,
       );
     }
+    final s = summary;
+    final delDate = s?.deletesDate;
+    // Sağ sütunda küçük satır: "+4 bugün", "−2 silme".
+    Widget line(String sign, int? v, String label, Color c, String tip) =>
+        Tooltip(
+          message: tip,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                v == null ? '—' : '$sign${_n(v)}',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: v == null ? AppColors.muted : c,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+            ],
+          ),
+        );
     return _Card(
       icon: Icons.download_outlined,
-      title: last == null ? 'KURULUM' : 'KURULUM · ${last.short}',
+      title: 'KURULUM',
       color: color,
       onTap: onTap,
       body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(
-            last == null ? '—' : '${last.count}',
-            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
+          Expanded(
+            child: Tooltip(
+              message: s?.total == null
+                  ? 'Toplam kurulum okunamadı.'
+                  : 'Yayından bu yana mağaza raporlarındaki toplam kurulum.',
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _n(s?.total),
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: SizedBox(
-                height: 30,
-                child: CustomPaint(painter: _Sparkline(d.values, color: color)),
-              ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                line(
+                  '+',
+                  today,
+                  'bugün',
+                  AppColors.text,
+                  today == null
+                      ? 'Bugünkü kurulum GA4 first_open olayından gelir; bu '
+                            'platformda GA4 verisi yok.'
+                      : 'GA4 first_open: bugün uygulamayı ilk kez açanlar. '
+                            'Gün henüz bitmedi.',
+                ),
+                const SizedBox(height: 2),
+                line(
+                  '−',
+                  s?.deletes,
+                  'silme',
+                  AppColors.muted,
+                  s?.deletes == null || delDate == null
+                      ? (s?.note ?? 'Silme sayısı okunamadı.')
+                      : '${StoreDay(delDate, 0).short} günü silinen kurulum '
+                            '(mağazanın en son raporladığı gün).',
+                ),
+              ],
             ),
           ),
         ],
@@ -909,19 +997,23 @@ class _InstallCard extends StatelessWidget {
       footer: Row(
         children: [
           sourceLabel(source, color),
-          if (rating?.average != null)
+          if ((rating?.total ?? rating?.average) != null)
             Tooltip(
-              message: 'Son yorumların ortalaması (${rating!.count} yorum)',
+              message: [
+                if (rating!.total != null)
+                  rating!.totalCount == null
+                      ? 'Mağazadaki genel puan'
+                      : 'Mağazadaki genel puan, ${_n(rating!.totalCount)} oy',
+                if (rating!.average != null)
+                  'Son 30 gün: ★${rating!.average!.toStringAsFixed(1)} '
+                      '(${rating!.count} yorum)',
+              ].join('\n'),
               child: Text(
-                ' ★${rating!.average!.toStringAsFixed(1)}',
+                ' ★${(rating!.total ?? rating!.average)!.toStringAsFixed(1)}'
+                '${rating!.totalCount == null ? '' : ' (${_n(rating!.totalCount)})'}',
                 style: const TextStyle(fontSize: 12, color: Color(0xFFFFC857)),
               ),
             ),
-          const Spacer(),
-          Text(
-            '7g ${d.week}',
-            style: const TextStyle(fontSize: 12, color: AppColors.text),
-          ),
         ],
       ),
     );
@@ -929,10 +1021,10 @@ class _InstallCard extends StatelessWidget {
 }
 
 class _Sparkline extends CustomPainter {
-  _Sparkline(this.values, {this.color = AppColors.ga4});
+  _Sparkline(this.values);
 
   final List<int> values;
-  final Color color;
+  final Color color = AppColors.ga4;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1206,14 +1298,14 @@ class _StoreRevenueCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget cell(String source, StoreSeries? d) {
-      final last = d?.last;
+      final last = d?.lastRevenue;
       final known = d != null && d.hasRevenue;
       return Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              known && last?.revenue != null ? _money(last!.revenue!) : '—',
+              known ? _money(d.monthRevenue ?? 0) : '—',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
@@ -1226,7 +1318,7 @@ class _StoreRevenueCard extends StatelessWidget {
                 Flexible(
                   child: Text(
                     known
-                        ? '${last!.short} · 7g ${_money(d.weekRevenue ?? 0)}'
+                        ? 'bu ay · ${last!.short} ${_money(last.revenue ?? 0)}'
                         : 'izin yok',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1255,7 +1347,8 @@ class _StoreRevenueCard extends StatelessWidget {
           cell('Google Play', play),
           const Tooltip(
             message:
-                'USD. App Store: raporlanan net gelir. Google Play: vergisiz '
+                'USD, ayın başından son raporlanan güne kadar; altında son '
+                'günün geliri. App Store: raporlanan net gelir. Google Play: vergisiz '
                 'fiyatın %85\'i (tahmini). Kurlar open.er-api.com\'dan.',
             child: Icon(Icons.info_outline, size: 14, color: AppColors.muted),
           ),

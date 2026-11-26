@@ -75,6 +75,7 @@ void fillDemo(AppState s) {
       d7Users: 3540,
       d30Users: 9120,
     ),
+    newInstalls: const {'ios': 24, 'android': 37},
   );
   s.admobData = const RevenueSummary(
     today: 11.37,
@@ -94,6 +95,16 @@ void fillDemo(AppState s) {
     ]),
   );
   s.appStoreRating = const RatingSummary(4.6, 38);
+  s.appStoreInstalls = InstallSummary(
+    total: 18452,
+    deletes: 14,
+    deletesDate: day(2),
+  );
+  s.playInstalls = InstallSummary(
+    total: 31207,
+    deletes: 29,
+    deletesDate: day(2),
+  );
   s.playData = StoreSeries(
     series(const [71, 66, 80, 74, 92, 85, 78, 88, 95, 81, 90, 102, 97, 89]),
     revenue: money(const [

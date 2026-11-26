@@ -119,11 +119,18 @@ class PlayClient {
       }
     }
     final money = await revenue(months: months, from: from, package: package);
+    // Satış raporu her gün güncellenir, kurulum raporu günlerce geriden
+    // gelir; gelir dünden geriye her gün için tutulur (satış yoksa 0).
+    final yesterday = ymd(now.subtract(const Duration(days: 1)));
     return StoreSeries(
       byDate,
       revenue: money == null
           ? null
-          : {for (final d in byDate.keys) d: money[d] ?? 0},
+          : ({
+              for (var i = days; i >= 1; i--)
+                ymd(now.subtract(Duration(days: i))): 0.0,
+              ...money,
+            }..removeWhere((d, _) => d.compareTo(yesterday) > 0)),
     );
   }
 
@@ -164,7 +171,11 @@ class PlayClient {
         for (final r in _parseCsv(f.content)) {
           final date = r['Order Charged Date'] ?? '';
           if (date.compareTo(from) < 0) continue;
-          if (package != null && r['Product ID'] != package) continue;
+          // Sütunun adı eskiden "Product ID" idi, şimdi "Package ID".
+          if (package != null &&
+              (r['Package ID'] ?? r['Product ID']) != package) {
+            continue;
+          }
           final status = (r['Financial Status'] ?? '').toLowerCase();
           final sign = status.contains('refund')
               ? -1
@@ -202,9 +213,10 @@ class PlayClient {
         '${d.year}${d.month.toString().padLeft(2, '0')}';
     try {
       for (final m in [month(now), month(DateTime(now.year, now.month, 0))]) {
+        // subscriptions_<paket>_<ürün>_<ay>_country.csv
         final files = await _list(
           'financial-stats/subscriptions/'
-          'subscriptions_${package ?? '*'}_${m}_*.csv',
+          'subscriptions_${package ?? '*'}_*_${m}_country.csv',
         );
         if (files.isEmpty) continue;
         var total = 0;
@@ -224,6 +236,94 @@ class PlayClient {
     return null;
   }
 
+  /// Bitmiş ayların kurulum toplamı, dosya adına göre.
+  final _monthInstalls = <String, int>{};
+
+  /// Toplam kurulum (bütün ayların `Daily User Installs` toplamı) ve en son
+  /// raporlanan günün silmesi (`Daily User Uninstalls`). [package] verilirse
+  /// yalnız o uygulama.
+  Future<InstallSummary> installSummary({String? package}) async {
+    final now = DateTime.now();
+    String month(DateTime d) =>
+        '${d.year}${d.month.toString().padLeft(2, '0')}';
+    // Ayın ilk günlerinde yeni ayın dosyası boş olabilir; önceki ay da okunur.
+    final months = {
+      month(now.subtract(const Duration(days: 10))),
+      month(now),
+    };
+    final re = RegExp(r'installs_(.+)_\d{6}_overview\.csv$');
+    final byPackage = <String, List<Map<String, String>>>{};
+    for (final m in months) {
+      final files = await _list(
+        'stats/installs/installs_${package ?? '*'}_${m}_overview.csv',
+      );
+      final csvs = await Future.wait(files.map(_download));
+      for (var i = 0; i < files.length; i++) {
+        final p = re.firstMatch(files[i])?.group(1) ?? files[i];
+        byPackage.putIfAbsent(p, () => []).addAll(csvs[i]);
+      }
+    }
+    if (kDebugMode && byPackage.isNotEmpty) {
+      final first = byPackage.values.firstWhere(
+        (r) => r.isNotEmpty,
+        orElse: () => const [],
+      );
+      if (first.isNotEmpty) debugPrint('Play kurulum sütunları: ${first.first.keys.join(' | ')}');
+    }
+
+    // `Total User Installs` artık 0 geliyor; toplam, yayından bu yana bütün
+    // ayların `Daily User Installs` toplamı. Bitmiş aylar bir kez indirilir.
+    final all = await _list(
+      'stats/installs/installs_${package ?? '*'}_*_overview.csv',
+    );
+    final fresh = {for (final m in months) '_${m}_overview.csv'};
+    var total = 0;
+    for (final f in all) {
+      final current = fresh.any(f.endsWith);
+      final cached = current ? null : _monthInstalls[f];
+      final n =
+          cached ??
+          (await _download(f)).fold<int>(
+            0,
+            (a, r) => a + (_find(r, 'daily user installs') ?? 0),
+          );
+      if (!current) _monthInstalls[f] = n;
+      total += n;
+    }
+
+    String? lastDate;
+    for (final rows in byPackage.values) {
+      final dated = rows.where((r) => (r['Date'] ?? '').isNotEmpty).toList()
+        ..sort((a, b) => a['Date']!.compareTo(b['Date']!));
+      if (dated.isEmpty) continue;
+      final d = dated.last['Date']!;
+      if (lastDate == null || d.compareTo(lastDate) > 0) lastDate = d;
+    }
+    int? deletes;
+    if (lastDate != null) {
+      for (final rows in byPackage.values) {
+        for (final r in rows) {
+          if (r['Date'] != lastDate) continue;
+          final n = _find(r, 'daily user uninstalls');
+          if (n != null) deletes = (deletes ?? 0) + n;
+        }
+      }
+    }
+    return InstallSummary(
+      total: all.isEmpty ? null : total,
+      deletes: deletes,
+      deletesDate: deletes == null ? null : lastDate,
+    );
+  }
+
+  /// [_pick] gibi; sütun yoksa null.
+  static int? _find(Map<String, String> row, String part) {
+    for (final e in row.entries) {
+      if (e.key.toLowerCase().contains(part)) return int.tryParse(e.value);
+    }
+    return null;
+  }
+
   /// Kovadaki kurulum dosyalarından paket adları.
   Future<Set<String>> packages() async {
     final files = await _list('stats/installs/installs_*_overview.csv');
@@ -231,12 +331,13 @@ class PlayClient {
     return {for (final f in files) ?re.firstMatch(f)?.group(1)};
   }
 
-  /// Son 7 günün yorumları, kovadaki aylık yorum raporlarından
+  /// Son 30 günün yorumları (App Store kartıyla aynı süre), kovadaki aylık
+  /// yorum raporlarından
   /// (`reviews/reviews_<paket>_<ay>.csv`; Play günde bir günceller). [package]
   /// verilirse yalnız o uygulama. Kovaya erişim yoksa null.
   Future<RatingSummary?> ratings({String? package}) async {
     final now = DateTime.now();
-    final since = now.subtract(const Duration(days: 7));
+    final since = now.subtract(const Duration(days: 30));
     String month(DateTime d) =>
         '${d.year}${d.month.toString().padLeft(2, '0')}';
     final stars = <int>[];
@@ -281,7 +382,39 @@ class PlayClient {
       return null;
     }
     low.sort((a, b) => b.at.compareTo(a.at));
-    return RatingSummary.of(stars, low: low);
+    final total = await _totalRating(package).catchError((_) => null);
+    return RatingSummary.of(stars, low: low, total: total);
+  }
+
+  /// Mağazadaki genel puan: aylık puan raporunun
+  /// (`stats/ratings/ratings_<paket>_<ay>_overview.csv`) son dolu
+  /// "Total Average Rating" değeri. Bu ay raporu yoksa geçen aya bakar. Birden
+  /// çok uygulamada düz ortalama alınır (Play oy sayısını vermez).
+  Future<double?> _totalRating(String? package) async {
+    final now = DateTime.now();
+    String month(DateTime d) =>
+        '${d.year}${d.month.toString().padLeft(2, '0')}';
+    for (final d in [now, DateTime(now.year, now.month - 1)]) {
+      final files = await _list(
+        'stats/ratings/ratings_${package ?? '*'}_${month(d)}_overview.csv',
+      );
+      final values = <double>[];
+      for (final rows in await Future.wait(files.map(_download))) {
+        for (final r in rows.reversed) {
+          final v = double.tryParse(
+            (r['Total Average Rating'] ?? '').replaceAll(',', '.'),
+          );
+          if (v != null && v > 0) {
+            values.add(v);
+            break;
+          }
+        }
+      }
+      if (values.isNotEmpty) {
+        return values.reduce((a, b) => a + b) / values.length;
+      }
+    }
+    return null;
   }
 
   Future<List<String>> _list(String glob) async {

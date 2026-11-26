@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'app_icons.dart';
 import 'drops.dart';
@@ -100,6 +103,7 @@ class Ga4Snapshot {
     required this.at,
     this.revenue,
     this.retention,
+    this.newInstalls,
   });
 
   final int realtime;
@@ -117,6 +121,10 @@ class Ga4Snapshot {
 
   /// D1/D7/D30 tutunma; kohort raporu alınamazsa null.
   final Retention? retention;
+
+  /// Bugünkü yeni kurulum (`first_open` olayı), küçük harf platforma göre
+  /// ("ios", "android"). Rapor alınamazsa null.
+  final Map<String, int>? newInstalls;
 }
 
 /// Yeni kullanıcıların ertesi gün (D1), 7. gün (D7) ve 30. gün (D30) dönme
@@ -214,12 +222,14 @@ class AppState extends ChangeNotifier {
 
   AppStoreClient? appStore;
   StoreSeries? appStoreData;
+  InstallSummary? appStoreInstalls;
   RatingSummary? appStoreRating;
   int? appStoreSubs;
   String? appStoreError;
 
   PlayClient? play;
   StoreSeries? playData;
+  InstallSummary? playInstalls;
   RatingSummary? playRating;
   int? playSubs;
   String? playError;
@@ -419,6 +429,7 @@ class AppState extends ChangeNotifier {
     appStore?.close();
     appStore = null;
     appStoreData = null;
+    appStoreInstalls = null;
     appStoreError = null;
     notifyListeners();
   }
@@ -529,6 +540,7 @@ class AppState extends ChangeNotifier {
     play?.close();
     play = null;
     playData = null;
+    playInstalls = null;
     playError = null;
     notifyListeners();
   }
@@ -598,8 +610,10 @@ class AppState extends ChangeNotifier {
     }
     ga4Data = null;
     appStoreData = null;
+    appStoreInstalls = null;
     appStoreRating = null;
     playData = null;
+    playInstalls = null;
     playRating = null;
     notifyListeners();
     await refresh(force: true);
@@ -826,14 +840,29 @@ class AppState extends ChangeNotifier {
   Future<void> _refreshAppStore(AppEntry? app) async {
     if (app != null && app.appleId == null) {
       appStoreData = null;
+      appStoreInstalls = null;
       appStoreRating = null;
       appStoreSubs = null;
       appStoreError = null;
       return;
     }
     try {
-      appStoreData = await appStore!.series(appleId: app?.appleId);
+      appStoreData = await appStore!.series(
+        days: _seriesDays(),
+        appleId: app?.appleId,
+      );
       appStoreError = null;
+      final total = appStore!
+          .totalInstalls(appleId: app?.appleId)
+          .then<int?>((n) => n)
+          .catchError((Object e) {
+            if (kDebugMode) debugPrint('Apple toplam kurulum: $e');
+            return null;
+          });
+      final deletes = await appStore!
+          .deletions(appleId: app?.appleId)
+          .catchError((Object e) => InstallSummary(note: '$e'));
+      appStoreInstalls = deletes.copyWith(total: await total);
       appStoreRating = await appStore!
           .ratings(appleId: app?.appleId)
           .catchError((_) => null);
@@ -848,14 +877,22 @@ class AppState extends ChangeNotifier {
   Future<void> _refreshPlay(AppEntry? app) async {
     if (app != null && app.playPackage == null) {
       playData = null;
+      playInstalls = null;
       playRating = null;
       playSubs = null;
       playError = null;
       return;
     }
     try {
-      playData = await play!.series(package: app?.playPackage);
+      playData = await play!.series(
+        days: _seriesDays(),
+        package: app?.playPackage,
+      );
       playError = null;
+      playInstalls = await play!
+          .installSummary(package: app?.playPackage)
+          .then<InstallSummary?>((s) => s)
+          .catchError((_) => null);
       playRating = await play!
           .ratings(package: app?.playPackage)
           .catchError((_) => null);
@@ -866,6 +903,10 @@ class AppState extends ChangeNotifier {
       playError = '$e';
     }
   }
+
+  /// Mağaza serisinin gün sayısı: en az 14, ayın ilk gününe kadar (aylık
+  /// gelir bu günlerden toplanır).
+  static int _seriesDays() => math.max(14, DateTime.now().day);
 
   /// [app] seçiliyse onun mülkü ve akışları kullanılır. Mülk ayarlı mülkten
   /// farklıysa özel boyut ve ölçüler o mülkte olmayabilir; kullanılmaz.
@@ -891,6 +932,28 @@ class AppState extends ChangeNotifier {
       limit: 20,
       streamIds: streams,
     );
+    // first_open uygulama ilk açılışta otomatik gelir; bugünkü kurulum yerine
+    // geçer. Data API saatleri mülkün saat dilimindedir ve birkaç saat geriden
+    // işlenir; dün+bugün saatlik çekilip yerel güne çevrilir, işlenmemiş son
+    // dakikalar anlık rapordan tamamlanır. Hata verirse kartta boş kalır.
+    final firstOpens = c
+        .zonedReport(
+          id,
+          dateRanges: [
+            {'startDate': 'yesterday', 'endDate': 'today'},
+          ],
+          dimensions: ['dateHour', 'platform'],
+          metrics: ['eventCount'],
+          limit: 200,
+          streamIds: streams,
+          eventName: 'first_open',
+        )
+        .then<({List<Map<String, String>> rows, String? timeZone})?>((r) => r)
+        .catchError((_) => null);
+    final recentOpens = c
+        .realtimeEvents(id, eventName: 'first_open', streamIds: streams)
+        .then<List<Map<String, String>>?>((r) => r)
+        .catchError((_) => null);
     final games = s.gameDimension == null
         ? Future.value(const <Map<String, String>>[])
         : c.report(
@@ -1005,7 +1068,101 @@ class AppState extends ChangeNotifier {
         await longCohorts,
         longDays,
       ),
+      newInstalls: _newInstalls(
+        '$id ${streams?.join(',') ?? ''}',
+        await firstOpens,
+        await recentOpens,
+        now,
+      ),
     );
+  }
+
+  /// Anlık rapordan görülen first_open'lar: mülk/akış anahtarı → UTC dakika
+  /// (epoch dakikası) → platform → sayı. Uygulama açık kaldıkça birikir; Data
+  /// API'nin henüz işlemediği saatleri doldurur (Telegram botunun yaptığı gibi).
+  static final _recentInstallMinutes = <String, Map<int, Map<String, int>>>{};
+  static bool _tzReady = false;
+
+  /// Platform → yerel gece yarısından bu yana kurulum. Her saat için Data API
+  /// ile anlık birikimin büyüğü alınır; ikisi aynı olayları sayar, toplanmaz.
+  static Map<String, int>? _newInstalls(
+    String key,
+    ({List<Map<String, String>> rows, String? timeZone})? hourly,
+    List<Map<String, String>>? recent,
+    DateTime now,
+  ) {
+    if (hourly == null && recent == null) return null;
+    const hourMs = 3600000;
+    final dayStart = DateTime(now.year, now.month, now.day)
+        .millisecondsSinceEpoch;
+    final nowMin = now.millisecondsSinceEpoch ~/ 60000;
+
+    final minutes = _recentInstallMinutes.putIfAbsent(key, () => {});
+    if (recent != null) {
+      // Pencere her istekte baştan gelir; o dakikalar yenisiyle değişir.
+      for (var m = nowMin - 29; m <= nowMin; m++) {
+        minutes.remove(m);
+      }
+      for (final r in recent) {
+        final p = (r['platform'] ?? '').toLowerCase();
+        if (p == 'web') continue;
+        final m = nowMin - (int.tryParse(r['minutesAgo'] ?? '') ?? 0);
+        final byPlatform = minutes.putIfAbsent(m, () => {});
+        byPlatform[p] =
+            (byPlatform[p] ?? 0) + (int.tryParse(r['eventCount'] ?? '') ?? 0);
+      }
+    }
+    minutes.removeWhere((m, _) => m * 60000 < dayStart);
+
+    // Saat başı (epoch ms) → platform → sayı.
+    final live = <int, Map<String, int>>{};
+    minutes.forEach((m, byPlatform) {
+      final h = m * 60000 ~/ hourMs * hourMs;
+      final slot = live.putIfAbsent(h, () => {});
+      byPlatform.forEach((p, n) => slot[p] = (slot[p] ?? 0) + n);
+    });
+
+    final processed = <int, Map<String, int>>{};
+    final platforms = <String>{};
+    if (hourly != null) {
+      tz.Location? zone;
+      final name = hourly.timeZone;
+      if (name != null) {
+        try {
+          if (!_tzReady) {
+            tzdata.initializeTimeZones();
+            _tzReady = true;
+          }
+          zone = tz.getLocation(name);
+        } catch (_) {}
+      }
+      for (final r in hourly.rows) {
+        final p = (r['platform'] ?? '').toLowerCase();
+        final d = r['dateHour'] ?? '';
+        if (p == 'web' || d.length != 10) continue;
+        platforms.add(p);
+        final y = int.parse(d.substring(0, 4));
+        final mo = int.parse(d.substring(4, 6));
+        final da = int.parse(d.substring(6, 8));
+        final ho = int.parse(d.substring(8, 10));
+        final start = zone == null
+            ? DateTime(y, mo, da, ho).millisecondsSinceEpoch
+            : tz.TZDateTime(zone, y, mo, da, ho).millisecondsSinceEpoch;
+        if (start < dayStart) continue;
+        final slot = processed.putIfAbsent(start, () => {});
+        slot[p] = (slot[p] ?? 0) + (int.tryParse(r['eventCount'] ?? '') ?? 0);
+      }
+    }
+
+    final out = {for (final p in platforms) p: 0};
+    for (final h in {...processed.keys, ...live.keys}) {
+      final a = processed[h] ?? const {};
+      final b = live[h] ?? const {};
+      for (final p in {...a.keys, ...b.keys}) {
+        out[p] = (out[p] ?? 0) + math.max(a[p] ?? 0, b[p] ?? 0);
+      }
+    }
+    return out;
   }
 
   static Retention? _retention(
