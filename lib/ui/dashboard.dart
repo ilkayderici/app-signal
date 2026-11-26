@@ -159,6 +159,14 @@ class Dashboard extends StatelessWidget {
                               data: state.playData,
                               summary: state.playInstalls,
                               today: data?.newInstalls?['android'],
+                              // GA4'te Android akışı varsa (first_open gelmiş)
+                              // ve app_remove raporu okunduysa, bugün olay
+                              // yoksa 0 silme.
+                              removedToday:
+                                  data?.removals != null &&
+                                      data?.newInstalls?['android'] != null
+                                  ? data!.removals!['android'] ?? 0
+                                  : null,
                               rating: state.playRating,
                               onTap: openPlay,
                             ),
@@ -876,8 +884,13 @@ class _InstallCard extends StatelessWidget {
     required this.onTap,
     this.summary,
     this.today,
+    this.removedToday,
     this.rating,
   });
+
+  /// Bugünkü silme, GA4 app_remove olayından (yalnız Android). Varsa mağaza
+  /// raporunun geriden gelen silmesinin yerine gösterilir.
+  final int? removedToday;
 
   final RatingSummary? rating;
   final String source;
@@ -1008,16 +1021,29 @@ class _InstallCard extends StatelessWidget {
                             'Gün henüz bitmedi.',
                 ),
                 const SizedBox(height: 2),
-                line(
-                  '−',
-                  s?.deletes,
-                  'silme',
-                  AppColors.muted,
-                  s?.deletes == null || delDate == null
-                      ? (s?.note ?? 'Silme sayısı okunamadı.')
-                      : '${StoreDay(delDate, 0).short} günü silinen kurulum '
-                            '(mağazanın en son raporladığı gün).',
-                ),
+                if (removedToday != null)
+                  line(
+                    '−',
+                    removedToday,
+                    'silme · bugün',
+                    AppColors.muted,
+                    'GA4 app_remove: bugün uygulamayı kaldıranlar. Gün henüz '
+                        'bitmedi; olay cihazdan birkaç saat gecikmeli gelebilir.',
+                  )
+                else
+                  line(
+                    '−',
+                    s?.deletes,
+                    // Mağaza silmeyi 1-2 gün geriden raporlar; gün etikette.
+                    delDate == null
+                        ? 'silme'
+                        : 'silme · ${StoreDay(delDate, 0).short}',
+                    AppColors.muted,
+                    s?.deletes == null || delDate == null
+                        ? (s?.note ?? 'Silme sayısı okunamadı.')
+                        : '${StoreDay(delDate, 0).short} günü silinen kurulum '
+                              '(mağazanın en son raporladığı gün).',
+                  ),
               ],
             ),
           ),
