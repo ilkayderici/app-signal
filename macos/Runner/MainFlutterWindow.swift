@@ -2,7 +2,17 @@ import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
+  /// Pencere kenarda gizliyken App Nap yenileme zamanlayıcısını uyutur. GA4
+  /// anlık raporu yalnız son 30 dakikayı tuttuğu için o arada kurulum
+  /// (first_open) dakikaları kaybolur. Sistem uykusuna izin verir.
+  private static var activity: NSObjectProtocol?
+
   override func awakeFromNib() {
+    MainFlutterWindow.activity = ProcessInfo.processInfo.beginActivity(
+      options: [.userInitiatedAllowingIdleSystemSleep],
+      reason: "GA4 kurulum sayımı arka planda sürsün"
+    )
+
     let flutterViewController = FlutterViewController()
     // Flutter şeffaf çizer; arkadaki bulanık cam görünür.
     flutterViewController.backgroundColor = .clear
