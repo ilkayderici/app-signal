@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -839,11 +840,73 @@ class AppState extends ChangeNotifier {
       ga4Error = null;
       return;
     }
+    _loadLiveMinutes();
     try {
       ga4Data = await _fetchGa4(ga4!, ga4Settings!, app);
       ga4Error = null;
     } catch (e) {
       ga4Error = '$e';
+    }
+    _saveLiveMinutes();
+  }
+
+  static const _liveMinutesPref = 'ga4.liveMinutes.v1';
+  static bool _liveLoaded = false;
+
+  /// Anlık rapordan biriken dakikalar yeniden başlatmada kaybolmasın: Data API
+  /// son saatleri birkaç saat geriden işler, o saatleri yalnız bu birikim
+  /// doldurur.
+  void _loadLiveMinutes() {
+    if (_liveLoaded) return;
+    _liveLoaded = true;
+    final raw = _prefs.getString(_liveMinutesPref);
+    if (raw == null) return;
+    decodeLiveMinutes(raw, DateTime.now()).forEach((key, minutes) {
+      final dest = _recentInstallMinutes.putIfAbsent(key, () => {});
+      minutes.forEach((m, byPlatform) => dest.putIfAbsent(m, () => byPlatform));
+    });
+  }
+
+  void _saveLiveMinutes() => unawaited(
+    _prefs.setString(
+      _liveMinutesPref,
+      encodeLiveMinutes(_recentInstallMinutes),
+    ),
+  );
+
+  /// Anahtar → epoch dakikası → platform → sayı; boş anahtarlar yazılmaz.
+  @visibleForTesting
+  static String encodeLiveMinutes(
+    Map<String, Map<int, Map<String, int>>> minutes,
+  ) => jsonEncode({
+    for (final e in minutes.entries)
+      if (e.value.isNotEmpty)
+        e.key: {for (final m in e.value.entries) '${m.key}': m.value},
+  });
+
+  /// [encodeLiveMinutes]'in tersi; [now]'dan bir günden eski dakikaları ve
+  /// bozuk kaydı atar.
+  @visibleForTesting
+  static Map<String, Map<int, Map<String, int>>> decodeLiveMinutes(
+    String raw,
+    DateTime now,
+  ) {
+    final oldest =
+        now.subtract(const Duration(days: 1)).millisecondsSinceEpoch ~/ 60000;
+    try {
+      return {
+        for (final e in (jsonDecode(raw) as Map<String, dynamic>).entries)
+          e.key: {
+            for (final m in (e.value as Map<String, dynamic>).entries)
+              if (int.parse(m.key) >= oldest)
+                int.parse(m.key): {
+                  for (final p in (m.value as Map<String, dynamic>).entries)
+                    p.key: p.value as int,
+                },
+          },
+      };
+    } catch (_) {
+      return {};
     }
   }
 

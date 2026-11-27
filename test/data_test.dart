@@ -1,3 +1,4 @@
+import 'package:app_signal/data/app_state.dart';
 import 'package:app_signal/data/appstore_client.dart';
 import 'package:app_signal/data/drops.dart';
 import 'package:app_signal/data/fx.dart';
@@ -85,5 +86,26 @@ void main() {
       expect(check(issuer: '1234'), contains('Issuer ID'));
       expect(check(vendor: 'V123'), contains('Vendor'));
     });
+  });
+
+  test('canlı first_open dakikaları kaydedilip geri okunur', () {
+    final now = DateTime(2026, 11, 27, 19, 30);
+    final m = now.millisecondsSinceEpoch ~/ 60000;
+    final old = m - 2 * 24 * 60;
+    final raw = AppState.encodeLiveMinutes({
+      '123 s1': {
+        m: {'ios': 2},
+        m - 90: {'android': 1, 'ios': 1},
+        old: {'ios': 5},
+      },
+      'remove 123 s1': {},
+    });
+    final back = AppState.decodeLiveMinutes(raw, now);
+    expect(back.keys, ['123 s1']);
+    expect(back['123 s1'], {
+      m: {'ios': 2},
+      m - 90: {'android': 1, 'ios': 1},
+    });
+    expect(AppState.decodeLiveMinutes('bozuk', now), isEmpty);
   });
 }
