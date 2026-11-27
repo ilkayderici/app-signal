@@ -244,13 +244,19 @@ class Dashboard extends StatelessWidget {
 }
 
 /// Hata, ağa hiç ulaşılamamasından mı (DNS, soket, bağlantı yok)?
+/// Ağ değişince ya da uykudan dönünce açık bağlantılar kopar; http paketi
+/// bunu `ClientException: Connection reset by peer` olarak verir.
 bool _isOffline(String? error) {
   if (error == null) return false;
   return error.contains('SocketException') ||
       error.contains('Failed host lookup') ||
       error.contains('Network is unreachable') ||
       error.contains('Connection refused') ||
-      error.contains('Connection timed out');
+      error.contains('Connection timed out') ||
+      error.contains('Connection reset') ||
+      error.contains('Connection closed') ||
+      error.contains('Software caused connection abort') ||
+      error.contains('Broken pipe');
 }
 
 String _hm(DateTime t) =>
