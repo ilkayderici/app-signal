@@ -74,6 +74,21 @@ class Dashboard extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                       ],
+                      // Bağlantı yokken her kaynak aynı ham soket hatasını
+                      // verir; bunlar tek bir kısa uyarıda toplanır.
+                      if ([
+                        state.ga4Error,
+                        state.appStoreError,
+                        state.playError,
+                        state.admobError,
+                      ].any(_isOffline)) ...[
+                        _ErrorBox(
+                          'İnternet bağlantısı yok. Son veriler gösteriliyor; '
+                          'yeniden denemek için dokunun.',
+                          onTap: () => state.refresh(force: true),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       for (final (msg, tap) in [
                         (
                           state.ga4Error == null
@@ -85,7 +100,7 @@ class Dashboard extends StatelessWidget {
                         (state.playError, openPlay),
                         (state.admobError, openAdmob),
                       ])
-                        if (msg != null) ...[
+                        if (msg != null && !_isOffline(msg)) ...[
                           _ErrorBox(msg, onTap: tap),
                           const SizedBox(height: 10),
                         ],
@@ -226,6 +241,16 @@ class Dashboard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Hata, ağa hiç ulaşılamamasından mı (DNS, soket, bağlantı yok)?
+bool _isOffline(String? error) {
+  if (error == null) return false;
+  return error.contains('SocketException') ||
+      error.contains('Failed host lookup') ||
+      error.contains('Network is unreachable') ||
+      error.contains('Connection refused') ||
+      error.contains('Connection timed out');
 }
 
 String _hm(DateTime t) =>
