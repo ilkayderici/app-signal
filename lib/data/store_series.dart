@@ -5,9 +5,8 @@ class StoreSeries {
     : days = (byDate.entries.toList()..sort((a, b) => a.key.compareTo(b.key)))
           .map((e) => StoreDay(e.key, e.value, revenue?[e.key]))
           .toList(),
-      revenueDays =
-          (revenue?.entries.toList() ?? [])
-            ..sort((a, b) => a.key.compareTo(b.key));
+      revenueDays = (revenue?.entries.toList() ?? [])
+        ..sort((a, b) => a.key.compareTo(b.key));
 
   /// Eskiden yeniye; tarih yyyy-MM-dd.
   final List<StoreDay> days;
@@ -42,8 +41,7 @@ class StoreSeries {
   /// null. Seri ayın başına kadar uzanmalı.
   double? get monthRevenue {
     final now = DateTime.now();
-    final prefix =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-';
+    final prefix = '${now.year}-${now.month.toString().padLeft(2, '0')}-';
     final month = revenueDays.where((e) => e.key.startsWith(prefix));
     if (revenueDays.isEmpty) return null;
     return month.fold<double>(0, (a, e) => a + e.value);

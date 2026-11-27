@@ -32,8 +32,7 @@ class Drop {
   int get percent => ((1 - last / base) * 100).round();
 
   /// Normalin kaç katı ("2,4").
-  String get times =>
-      (last / base).toStringAsFixed(1).replaceFirst('.', ',');
+  String get times => (last / base).toStringAsFixed(1).replaceFirst('.', ',');
 
   String get text => textFor();
 

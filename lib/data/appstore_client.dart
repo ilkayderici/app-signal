@@ -205,8 +205,11 @@ class AppStoreClient {
       if (each == 0 || n == 0) continue;
       final p = cell(r, parent);
       final key = p.isEmpty ? id : 'sku:$p';
-      addMoney(day.proceeds.putIfAbsent(key, () => {}), cell(r, currency),
-          each * n);
+      addMoney(
+        day.proceeds.putIfAbsent(key, () => {}),
+        cell(r, currency),
+        each * n,
+      );
     }
     _cache[cacheKey] = day;
     return day;
@@ -356,8 +359,10 @@ class AppStoreClient {
       if (url == null) continue;
       final res = await _http.get(Uri.parse(url));
       if (res.statusCode != 200) {
-        throw StoreException('App Store: silme raporu indirilemedi '
-            '(HTTP ${res.statusCode}).');
+        throw StoreException(
+          'App Store: silme raporu indirilemedi '
+          '(HTTP ${res.statusCode}).',
+        );
       }
       var bytes = res.bodyBytes as List<int>;
       if (bytes.length > 2 && bytes[0] == 0x1f && bytes[1] == 0x8b) {
@@ -372,10 +377,7 @@ class AppStoreClient {
   /// Rapor satırlarından `Event` = Delete olanların `Counts` toplamı, güne
   /// göre. Sütun adları büyük/küçük harf duyarsız aranır.
   static void _sumDeletes(String text, String appId, Map<String, int> out) {
-    final lines = text
-        .split('\n')
-        .where((l) => l.trim().isNotEmpty)
-        .toList();
+    final lines = text.split('\n').where((l) => l.trim().isNotEmpty).toList();
     if (lines.isEmpty) return;
     final sep = lines.first.contains('\t') ? '\t' : ',';
     List<String> split(String l) => [
@@ -599,7 +601,11 @@ class AppStoreClient {
       final results = await Future.wait([
         for (final c in _storefronts.skip(i).take(25))
           _http
-              .get(Uri.parse('https://itunes.apple.com/lookup?id=$appId&country=$c'))
+              .get(
+                Uri.parse(
+                  'https://itunes.apple.com/lookup?id=$appId&country=$c',
+                ),
+              )
               .then<http.Response?>((r) => r)
               .catchError((_) => null),
       ]);
@@ -637,9 +643,8 @@ class AppStoreClient {
       return 'Key ID 10 karakterli olmalı (ör. 2X9R4HXF34). Anahtar listesinde '
           '"Key ID" sütununda yazar.';
     }
-    if (!RegExp(
-      r'^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$',
-    ).hasMatch(issuerId)) {
+    if (!RegExp(r'^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$')
+        .hasMatch(issuerId)) {
       return 'Issuer ID bir UUID olmalı (ör. 57246542-96fe-1a63-e053-…). '
           'Integrations sayfasında anahtar listesinin üstünde yazar.';
     }

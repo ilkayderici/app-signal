@@ -247,10 +247,7 @@ class PlayClient {
     String month(DateTime d) =>
         '${d.year}${d.month.toString().padLeft(2, '0')}';
     // Ayın ilk günlerinde yeni ayın dosyası boş olabilir; önceki ay da okunur.
-    final months = {
-      month(now.subtract(const Duration(days: 10))),
-      month(now),
-    };
+    final months = {month(now.subtract(const Duration(days: 10))), month(now)};
     final re = RegExp(r'installs_(.+)_\d{6}_overview\.csv$');
     final byPackage = <String, List<Map<String, String>>>{};
     for (final m in months) {
@@ -268,7 +265,8 @@ class PlayClient {
         (r) => r.isNotEmpty,
         orElse: () => const [],
       );
-      if (first.isNotEmpty) debugPrint('Play kurulum sütunları: ${first.first.keys.join(' | ')}');
+      if (first.isNotEmpty)
+        debugPrint('Play kurulum sütunları: ${first.first.keys.join(' | ')}');
     }
 
     // `Total User Installs` artık 0 geliyor; toplam, yayından bu yana bütün
@@ -283,10 +281,9 @@ class PlayClient {
       final cached = current ? null : _monthInstalls[f];
       final n =
           cached ??
-          (await _download(f)).fold<int>(
-            0,
-            (a, r) => a + (_find(r, 'daily user installs') ?? 0),
-          );
+          (await _download(
+            f,
+          )).fold<int>(0, (a, r) => a + (_find(r, 'daily user installs') ?? 0));
       if (!current) _monthInstalls[f] = n;
       total += n;
     }

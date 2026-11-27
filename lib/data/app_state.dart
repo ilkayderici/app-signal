@@ -105,7 +105,6 @@ class Ga4Snapshot {
     this.revenue,
     this.retention,
     this.newInstalls,
-    this.removals,
   });
 
   final int realtime;
@@ -127,10 +126,6 @@ class Ga4Snapshot {
   /// Bugünkü yeni kurulum (`first_open` olayı), küçük harf platforma göre
   /// ("ios", "android"). Rapor alınamazsa null.
   final Map<String, int>? newInstalls;
-
-  /// Bugünkü kaldırma (`app_remove` olayı), platforma göre. Firebase bu olayı
-  /// yalnız Android'de gönderir; iOS'ta gelmez. Rapor alınamazsa null.
-  final Map<String, int>? removals;
 }
 
 /// Yeni kullanıcıların ertesi gün (D1), 7. gün (D7) ve 30. gün (D30) dönme
@@ -1027,26 +1022,6 @@ class AppState extends ChangeNotifier {
         .realtimeEvents(id, eventName: 'first_open', streamIds: streams)
         .then<List<Map<String, String>>?>((r) => r)
         .catchError((_) => null);
-    // app_remove: Android'de uygulama kaldırılınca Play services gönderir.
-    // Mağaza raporu günler geriden geldiği için bugünkü silme buradan okunur.
-    final removes = c
-        .zonedReport(
-          id,
-          dateRanges: [
-            {'startDate': 'yesterday', 'endDate': 'today'},
-          ],
-          dimensions: ['dateHour', 'platform'],
-          metrics: ['eventCount'],
-          limit: 200,
-          streamIds: streams,
-          eventName: 'app_remove',
-        )
-        .then<({List<Map<String, String>> rows, String? timeZone})?>((r) => r)
-        .catchError((_) => null);
-    final recentRemoves = c
-        .realtimeEvents(id, eventName: 'app_remove', streamIds: streams)
-        .then<List<Map<String, String>>?>((r) => r)
-        .catchError((_) => null);
     final games = s.gameDimension == null
         ? Future.value(const <Map<String, String>>[])
         : c.report(
@@ -1165,12 +1140,6 @@ class AppState extends ChangeNotifier {
         '$id ${streams?.join(',') ?? ''}',
         await firstOpens,
         await recentOpens,
-        now,
-      ),
-      removals: _newInstalls(
-        'remove $id ${streams?.join(',') ?? ''}',
-        await removes,
-        await recentRemoves,
         now,
       ),
     );

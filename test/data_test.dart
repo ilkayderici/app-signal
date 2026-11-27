@@ -48,7 +48,9 @@ void main() {
   });
 
   test('StoreSeries hafta ve gelir', () {
-    final dates = [for (var i = 1; i <= 14; i++) '2026-11-${'$i'.padLeft(2, '0')}'];
+    final dates = [
+      for (var i = 1; i <= 14; i++) '2026-11-${'$i'.padLeft(2, '0')}',
+    ];
     final s = StoreSeries(
       {for (final d in dates) d: 10},
       revenue: {for (final d in dates) d: 1.5},
