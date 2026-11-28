@@ -325,22 +325,34 @@ class AppState extends ChangeNotifier {
 
   Future<void> _restore() async {
     await _secrets.adopt(_prefs);
+    await _connectSaved();
+    restoring = false;
+    notifyListeners();
+    await refresh(force: true);
+  }
+
+  /// Kayıtlı anahtarlarla henüz bağlı olmayan kaynakları bağlar. Açılışta ağ
+  /// yoksa (ör. Windows oturum açılışı) bağlantı düşer; [refresh] hata
+  /// sürdükçe bunu yeniden çağırır, yoksa hata kalıcı olurdu.
+  Future<void> _connectSaved() async {
     final ga4Json = await _secrets.read(SecretStore.ga4Key);
     final ga4Token = await _secrets.read(SecretStore.ga4RefreshKey);
-    try {
-      if (ga4Token != null) {
-        ga4 = Ga4Client.fromToken(
-          AdmobClient.clientId(await AdmobClient.builtInClient()),
-          ga4Token,
-        );
-      } else if (ga4Json != null) {
-        ga4 = await Ga4Client.connect(ga4Json);
+    if (ga4 == null) {
+      try {
+        if (ga4Token != null) {
+          ga4 = Ga4Client.fromToken(
+            AdmobClient.clientId(await AdmobClient.builtInClient()),
+            ga4Token,
+          );
+        } else if (ga4Json != null) {
+          ga4 = await Ga4Client.connect(ga4Json);
+        }
+      } catch (e) {
+        ga4Error = '$e';
       }
-    } catch (e) {
-      ga4Error = '$e';
     }
     final p8 = await _secrets.read(SecretStore.appStoreKey);
-    if (p8 != null) {
+    if (p8 != null && appStore == null) {
       try {
         appStore = AppStoreClient(
           p8: p8,
@@ -355,7 +367,9 @@ class AppState extends ChangeNotifier {
     final playJson = await _secrets.read(SecretStore.playKey);
     final playToken = await _secrets.read(SecretStore.playRefreshKey);
     final bucket = pref('play.bucket');
-    if ((playToken != null || playJson != null) && bucket != null) {
+    if ((playToken != null || playJson != null) &&
+        bucket != null &&
+        play == null) {
       try {
         play = playToken != null
             ? PlayClient.fromToken(
@@ -369,7 +383,7 @@ class AppState extends ChangeNotifier {
       }
     }
     final admobToken = await _secrets.read(SecretStore.admobRefreshKey);
-    if (admobToken != null) {
+    if (admobToken != null && admob == null) {
       try {
         final admobJson =
             await _secrets.read(SecretStore.admobClientKey) ??
@@ -379,9 +393,6 @@ class AppState extends ChangeNotifier {
         admobError = '$e';
       }
     }
-    restoring = false;
-    notifyListeners();
-    await refresh(force: true);
   }
 
   /// GA4 için kayıtlı servis hesabı JSON'u (Play'de aynısını kullanmak için).
@@ -729,13 +740,29 @@ class AppState extends ChangeNotifier {
       _again = true;
       return;
     }
-    if (!anyReady || demoMode) return;
-    final stores =
-        force ||
-        _storesAt == null ||
-        DateTime.now().difference(_storesAt!) > const Duration(hours: 1);
+    if (demoMode || restoring) return;
+    final failed = [
+      ga4Error,
+      appStoreError,
+      playError,
+      admobError,
+    ].any((e) => e != null);
     loading = true;
     notifyListeners();
+    // Önceki deneme hata verdiyse bağlanamayan kaynağı yeniden bağla.
+    if (failed) await _connectSaved();
+    if (!anyReady) {
+      loading = false;
+      notifyListeners();
+      return;
+    }
+    // Mağaza hatası varsa saatlik sınırı bekleme; bağlantı dönünce hemen dene.
+    final stores =
+        force ||
+        appStoreError != null ||
+        playError != null ||
+        _storesAt == null ||
+        DateTime.now().difference(_storesAt!) > const Duration(hours: 1);
     if (stores || apps.isEmpty) await _discoverApps();
     final app = selectedApp;
     await Future.wait([
