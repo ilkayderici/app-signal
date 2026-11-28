@@ -823,9 +823,9 @@ class _RevenueCard extends StatelessWidget {
                 if (r.ecpm != null)
                   Text(
                     'eBGBM ${_money(r.ecpm!, r.currency)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.muted,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.muted.withValues(alpha: 0.8),
                     ),
                   ),
               ],
