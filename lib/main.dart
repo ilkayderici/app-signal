@@ -16,14 +16,17 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
 
-  const options = WindowOptions(
+  final options = WindowOptions(
     size: _windowSize,
     minimumSize: Size(360, 480),
     titleBarStyle: TitleBarStyle.hidden,
     windowButtonVisibility: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    backgroundColor: Colors.transparent,
+    // Windows'ta cam (bulanıklık) yok: saydam pencere arkayı çıplak gösterir
+    // ve yeniden çizimde beyaz yanıp söner. Orada düz koyu zemin.
+    backgroundColor:
+        Platform.isWindows ? AppColors.background : Colors.transparent,
   );
   await windowManager.waitUntilReadyToShow(options, () async {
     await windowManager.setAsFrameless();

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 /// Renkler tek yerde. Koyu, sade; her veri kaynağının kendi vurgu rengi var.
@@ -19,16 +21,25 @@ abstract final class AppColors {
 abstract final class Glass {
   static const radius = 12.0;
 
-  /// Pencere zemini: arkadaki bulanıklık hafif görünsün diye yarı saydam.
-  static BoxDecoration window() => BoxDecoration(
-    gradient: const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [Color(0xA6141A24), Color(0xCC090B10)],
-    ),
-    borderRadius: BorderRadius.circular(14),
-    border: Border.all(color: const Color(0x24FFFFFF)),
-  );
+  /// Pencere zemini: Mac'te arkadaki bulanıklık hafif görünsün diye yarı
+  /// saydam. Windows'ta bulanıklık yok; zemin opak, köşeyi DWM yuvarlar.
+  static BoxDecoration window() => Platform.isWindows
+      ? const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF141A24), Color(0xFF090B10)],
+          ),
+        )
+      : BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xA6141A24), Color(0xCC090B10)],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x24FFFFFF)),
+        );
 
   /// Kart yüzeyi.
   static BoxDecoration card({double r = radius}) => BoxDecoration(

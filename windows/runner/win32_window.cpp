@@ -97,7 +97,9 @@ const wchar_t* WindowClassRegistrar::GetWindowClass() {
     window_class.hInstance = GetModuleHandle(nullptr);
     window_class.hIcon =
         LoadIcon(window_class.hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
-    window_class.hbrBackground = 0;
+    // Uygulamanın zemin rengi (AppColors.background). Flutter çizene kadar
+    // ya da pencere yeniden gösterilirken beyaz yanıp sönmesin.
+    window_class.hbrBackground = CreateSolidBrush(RGB(0x0E, 0x11, 0x16));
     window_class.lpszMenuName = nullptr;
     window_class.lpfnWndProc = Win32Window::WndProc;
     RegisterClass(&window_class);
@@ -145,6 +147,11 @@ bool Win32Window::Create(const std::wstring& title,
   }
 
   UpdateTheme(window);
+
+  // Windows 11'de çerçevesiz pencereye yuvarlak köşe (eski sürümlerde etkisiz).
+  DWORD corner = 2;  // DWMWCP_ROUND
+  DwmSetWindowAttribute(window, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */,
+                        &corner, sizeof(corner));
 
   return OnCreate();
 }
