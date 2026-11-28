@@ -98,12 +98,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "dev.appsignal" "\0"
-            VALUE "FileDescription", "app_signal" "\0"
+            VALUE "FileDescription", "App Signal" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "app_signal" "\0"
+            VALUE "InternalName", "App Signal" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 dev.appsignal. All rights reserved." "\0"
             VALUE "OriginalFilename", "app_signal.exe" "\0"
-            VALUE "ProductName", "app_signal" "\0"
+            VALUE "ProductName", "App Signal" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

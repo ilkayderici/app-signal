@@ -83,7 +83,10 @@ class Drop {
   }
 }
 
-/// macOS bildirimleri. İlk bildirimde sistem izin sorar.
+/// macOS ve Windows bildirimleri. Mac'te ilk bildirimde sistem izin sorar.
+/// Windows'ta bildirim uygulama kimliğine (AUMID) bağlıdır; kurulum programı
+/// Başlat menüsü kısayolunu aynı kimlikle oluşturur
+/// (`windows/installer/app_signal.iss`).
 class Notifier {
   static final _plugin = FlutterLocalNotificationsPlugin();
   static bool _ready = false;
@@ -94,6 +97,11 @@ class Notifier {
       await _plugin.initialize(
         settings: const InitializationSettings(
           macOS: DarwinInitializationSettings(),
+          windows: WindowsInitializationSettings(
+            appName: 'App Signal',
+            appUserModelId: 'dev.appsignal.AppSignal',
+            guid: '191f9453-6ace-4ec9-b179-b81c42592e4a',
+          ),
         ),
       );
       _ready = true;
@@ -104,6 +112,7 @@ class Notifier {
       body: body,
       notificationDetails: const NotificationDetails(
         macOS: DarwinNotificationDetails(),
+        windows: WindowsNotificationDetails(),
       ),
     );
   }

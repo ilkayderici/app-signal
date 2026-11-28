@@ -84,16 +84,26 @@ class _AppSignalState extends State<AppSignal> with TrayListener {
   String? _title;
 
   /// Menü çubuğunda simgenin yanında canlı kullanıcı (son 30 dk). Düşüş ya da
-  /// kötü yorum varsa yanına uyarı işareti.
+  /// kötü yorum varsa yanına uyarı işareti. Windows tepsisi başlık göstermez;
+  /// aynı bilgi simgenin ipucuna yazılır.
   void _updateTitle() {
-    if (!Platform.isMacOS) return;
     final s = widget.state;
     final live = s.ga4Data?.realtime;
     final alert = s.drops.isNotEmpty || s.lowReviews.isNotEmpty;
     final title = [if (live != null) '$live', if (alert) '⚠'].join(' ');
     if (title == _title) return;
     _title = title;
-    trayManager.setTitle(title);
+    if (Platform.isMacOS) {
+      trayManager.setTitle(title);
+    } else {
+      trayManager.setToolTip(
+        [
+          'App Signal',
+          if (live != null) '$live canlı',
+          if (alert) '⚠',
+        ].join(' · '),
+      );
+    }
   }
 
   Future<void> _toggleWindow() => EdgeDock.instance.toggle();

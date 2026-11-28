@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WinSparkle appcast şablonu. Her sürümde kopyalayıp dist/appcast-windows.xml
+  olarak doldur (adımlar: docs/surum-cikarma.md, 6. adım).
+
+  SURUM       ör. 1.0.5
+  BUILD       pubspec.yaml'daki + sonrası, ör. 6 (karşılaştırma bununla)
+  IMZA, BOYUT Mac'te: macos/Pods/Sparkle/bin/sign_update dist/AppSignal-SURUM-setup.exe
+              çıktısındaki sparkle:edSignature ve length değerleri
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>App Signal</title>
+    <item>
+      <title>SURUM</title>
+      <pubDate>TARIH (RFC 822, ör. Sat, 28 Nov 2026 12:00:00 +0300)</pubDate>
+      <sparkle:version>BUILD</sparkle:version>
+      <sparkle:shortVersionString>SURUM</sparkle:shortVersionString>
+      <enclosure
+        url="https://github.com/ilkayderici/app-signal/releases/download/vSURUM/AppSignal-SURUM-setup.exe"
+        sparkle:os="windows"
+        sparkle:installerArguments="/SILENT /SP- /NOCANCEL /NORESTART"
+        sparkle:edSignature="IMZA"
+        length="BOYUT"
+        type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

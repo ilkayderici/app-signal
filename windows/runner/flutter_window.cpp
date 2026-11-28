@@ -1,8 +1,21 @@
 #include "flutter_window.h"
 
+#include <flutter/standard_method_codec.h>
+
 #include <optional>
+#include <vector>
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+
+// window_manager konumları mantıksal piksel olarak alır (fiziksel / ölçek).
+double ScaleFor(HWND hwnd) {
+  UINT dpi = hwnd ? ::GetDpiForWindow(hwnd) : 0;
+  return (dpi ? dpi : 96) / 96.0;
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,6 +38,7 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  RegisterScreenChannel();
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -39,7 +53,46 @@ bool FlutterWindow::OnCreate() {
   return true;
 }
 
+// macOS'taki kanalın karşılığı. Ana ekranın görev çubuğu hariç alanı
+// ([x, y, genişlik, yükseklik]) ve imleç ([x, y]); sol üst köşe başlangıç.
+void FlutterWindow::RegisterScreenChannel() {
+  screen_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "app_signal/screen",
+          &flutter::StandardMethodCodec::GetInstance());
+  screen_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        const double scale = ScaleFor(GetHandle());
+        if (call.method_name() == "cursor") {
+          POINT p;
+          if (!::GetCursorPos(&p)) {
+            result->Success();
+            return;
+          }
+          result->Success(flutter::EncodableValue(
+              std::vector<double>{p.x / scale, p.y / scale}));
+        } else if (call.method_name() == "visibleFrame") {
+          HMONITOR monitor =
+              ::MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+          MONITORINFO info{sizeof(MONITORINFO)};
+          if (!::GetMonitorInfo(monitor, &info)) {
+            result->Success();
+            return;
+          }
+          const RECT& r = info.rcWork;
+          result->Success(flutter::EncodableValue(std::vector<double>{
+              r.left / scale, r.top / scale, (r.right - r.left) / scale,
+              (r.bottom - r.top) / scale}));
+        } else {
+          result->NotImplemented();
+        }
+      });
+}
+
 void FlutterWindow::OnDestroy() {
+  screen_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

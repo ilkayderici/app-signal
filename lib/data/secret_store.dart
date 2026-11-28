@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -32,6 +34,7 @@ class SecretStore {
   /// sorulur. Bir kez silip yeniden yazınca kayıt bu imzaya geçer; geliştirici
   /// sertifikasıyla imza derlemeden derlemeye değişmediği için soru biter.
   Future<void> adopt(SharedPreferences prefs) async {
+    if (!Platform.isMacOS) return;
     const flag = 'secrets.adopted.v1';
     if (prefs.getBool(flag) ?? false) return;
     for (final key in const [ga4Key, appStoreKey, playKey]) {

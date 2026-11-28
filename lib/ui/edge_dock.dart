@@ -28,7 +28,8 @@ class EdgeDock {
   bool _animating = false;
   bool _autoHide = false;
 
-  bool get _supported => Platform.isMacOS;
+  /// Ekran kanalı (`app_signal/screen`) macOS ve Windows runner'ında var.
+  bool get _supported => Platform.isMacOS || Platform.isWindows;
 
   Future<Rect?> _screen() async {
     final f = await _channel.invokeListMethod<double>('visibleFrame');
