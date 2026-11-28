@@ -6,17 +6,19 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'store_series.dart';
+import 'net_retry.dart';
 
 /// AdMob Report API'den gerçek tahmini kazancı okur. AdMob servis hesabını
 /// kabul etmez; uygulamaya gömülü masaüstü OAuth istemcisiyle kullanıcı
 /// yalnız Google ile giriş yapar.
 class AdmobClient {
-  AdmobClient._(this._client, this.publisher, this.currency);
+  AdmobClient._(http.Client inner, this.publisher, this.currency)
+    : _client = retrying(inner);
 
   static const _api = 'https://admob.googleapis.com/v1';
   static const _scopes = ['https://www.googleapis.com/auth/admob.readonly'];
 
-  final AutoRefreshingAuthClient _client;
+  final http.Client _client;
 
   /// "accounts/pub-123".
   final String publisher;

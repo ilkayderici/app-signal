@@ -3,17 +3,19 @@ import 'dart:convert';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
 
+import 'net_retry.dart';
+
 /// GA4'e yalnız okuma izniyle bağlanan istemci. Servis hesabı JSON'u ya da
 /// Google girişiyle kimlik doğrular; Admin API'den mülkleri, Data API'den
 /// raporları çeker.
 class Ga4Client {
-  Ga4Client._(this._client, this.email);
+  Ga4Client._(http.Client inner, this.email) : _client = retrying(inner);
 
   static const scopes = ['https://www.googleapis.com/auth/analytics.readonly'];
   static const _data = 'https://analyticsdata.googleapis.com/v1beta';
   static const _admin = 'https://analyticsadmin.googleapis.com/v1beta';
 
-  final AutoRefreshingAuthClient _client;
+  final http.Client _client;
 
   /// Servis hesabının e-postası; kullanıcı bunu GA4'e "Görüntüleyen" ekler.
   /// Google girişinde null (kullanıcının kendi erişimi kullanılır).

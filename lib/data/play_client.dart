@@ -7,20 +7,22 @@ import 'package:http/http.dart' as http;
 
 import 'fx.dart';
 import 'store_series.dart';
+import 'net_retry.dart';
 
 /// Play Console toplu raporlarından (Cloud Storage kovası) kurulum, gelir,
 /// abone ve yorumları okur; yalnız salt okuma Cloud Storage izni ister. Ya Google girişi (kullanıcının kendi Play Console erişimi) ya da
 /// servis hesabı kullanılır; servis hesabına Play Console'da "Uygulama
 /// bilgilerini görüntüleme ve toplu raporları indirme" izni verilmeli.
 class PlayClient {
-  PlayClient._(this._client, this.email, this.bucket);
+  PlayClient._(http.Client inner, this.email, this.bucket)
+    : _client = retrying(inner);
 
   static const _api = 'https://storage.googleapis.com/storage/v1';
   static const scopes = [
     'https://www.googleapis.com/auth/devstorage.read_only',
   ];
 
-  final AutoRefreshingAuthClient _client;
+  final http.Client _client;
 
   /// Servis hesabının e-postası; Google girişinde null.
   final String? email;
