@@ -141,8 +141,18 @@ class Dashboard extends StatelessWidget {
                                     title: 'REKLAM GELİRİ',
                                     source: 'AdMob',
                                     color: AppColors.admob,
-                                    action: state.restoring ? '' : 'Bağla',
-                                    loading: state.restoring,
+                                    action: state.restoring
+                                        ? ''
+                                        : state.admob == null
+                                        ? 'Bağla'
+                                        : state.admobMissing
+                                        ? 'Yok'
+                                        : '',
+                                    loading:
+                                        state.restoring ||
+                                        (state.admob != null &&
+                                            !state.admobMissing &&
+                                            state.admobError == null),
                                     onTap: openAdmob,
                                   ),
                           ),

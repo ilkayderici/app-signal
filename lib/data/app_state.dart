@@ -208,6 +208,7 @@ class AppState extends ChangeNotifier {
       debugPrint('APP_SIGNAL_RESET: ayarlar ve anahtarlar silindi');
     }
     s.ga4Settings = Ga4Settings.load(s._prefs);
+    _minutePrefs = s._prefs;
     s.selectedAppId = s._prefs.getString('app.selected');
     if (demoMode) {
       fillDemo(s);
@@ -264,6 +265,9 @@ class AppState extends ChangeNotifier {
       selectedApp != null && selectedApp!.playPackage == null;
   bool get ga4Missing =>
       selectedApp != null && selectedApp!.ga4PropertyId == null;
+
+  /// Seçili uygulama AdMob hesabında yoksa true (son yenilemede anlaşılır).
+  bool admobMissing = false;
 
   /// Mağaza verisi günde bir değişir; en çok saatte bir çekilir.
   DateTime? _storesAt;
@@ -530,6 +534,7 @@ class AppState extends ChangeNotifier {
     admob?.close();
     admob = null;
     admobData = null;
+    admobMissing = false;
     admobError = null;
     notifyListeners();
   }
@@ -538,6 +543,7 @@ class AppState extends ChangeNotifier {
     try {
       final ids = app == null ? null : {?app.appleId, ?app.playPackage, app.id};
       final r = await admob!.earnings(storeIds: ids);
+      admobMissing = r == null;
       admobData = r == null
           ? null
           : RevenueSummary(
@@ -1183,6 +1189,38 @@ class AppState extends ChangeNotifier {
   static final _recentInstallMinutes = <String, Map<int, Map<String, int>>>{};
   static bool _tzReady = false;
 
+  /// Birikim tercih dosyasında da durur; uygulama yeniden açılınca (ör.
+  /// güncellemeden sonra) o güne kadar görülen dakikalar kaybolmaz.
+  static SharedPreferences? _minutePrefs;
+
+  static Map<int, Map<String, int>> _loadMinutes(String key) {
+    final raw = _minutePrefs?.getString('liveMinutes.$key');
+    if (raw == null) return {};
+    try {
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      return {
+        for (final e in json.entries)
+          int.parse(e.key): {
+            for (final p in (e.value as Map<String, dynamic>).entries)
+              p.key: p.value as int,
+          },
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static void _saveMinutes(String key, Map<int, Map<String, int>> minutes) {
+    final p = _minutePrefs;
+    if (p == null) return;
+    unawaited(
+      p.setString(
+        'liveMinutes.$key',
+        jsonEncode({for (final e in minutes.entries) '${e.key}': e.value}),
+      ),
+    );
+  }
+
   /// Platform → yerel gece yarısından bu yana olay sayısı (first_open ya da
   /// app_remove; [key] ikisini ayrı tutar). Her saat için Data API
   /// ile anlık birikimin büyüğü alınır; ikisi aynı olayları sayar, toplanmaz.
@@ -1201,7 +1239,10 @@ class AppState extends ChangeNotifier {
     ).millisecondsSinceEpoch;
     final nowMin = now.millisecondsSinceEpoch ~/ 60000;
 
-    final minutes = _recentInstallMinutes.putIfAbsent(key, () => {});
+    final minutes = _recentInstallMinutes.putIfAbsent(
+      key,
+      () => _loadMinutes(key),
+    );
     if (recent != null) {
       // Pencere her istekte baştan gelir; o dakikalar yenisiyle değişir.
       for (var m = nowMin - 29; m <= nowMin; m++) {
@@ -1217,6 +1258,7 @@ class AppState extends ChangeNotifier {
       }
     }
     minutes.removeWhere((m, _) => m * 60000 < dayStart);
+    if (recent != null) _saveMinutes(key, minutes);
 
     // Saat başı (epoch ms) → platform → sayı.
     final live = <int, Map<String, int>>{};
