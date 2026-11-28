@@ -2,33 +2,33 @@
 
 Windows kodu yazıldı ama henüz derlenip denenmedi. Bu makinedeki Visual Studio 2022'de "Desktop development with C++" iş yükü eksik (MSVC, C++ CMake araçları, Windows 10/11 SDK). Bu liste kalan işleri toplar.
 
-## Şimdi: 1.0.5 Windows kurulumunu çıkar
+## Şimdi: 1.0.6 Windows kurulumunu çıkar
 
-Mac 1.0.5 yayında (GitHub sürümü `v1.0.5`). Sürümde Windows dosyaları yok; Windows'taki uygulama güncelleme bulamaz. Sırayla:
+1.0.5 Windows kurulumu yayında ve imzalı (`v1.0.5`). Mac 1.0.6 yayında (`v1.0.6`). `v1.0.6` sürümündeki `appcast-windows.xml` şimdilik 1.0.5 kurulumunu gösteriyor; Windows'taki uygulama 1.0.6'yı görmez. Sırayla:
 
 ### Windows'ta
 
-Durum (28.11.2026): 1-6 ve 8 yapıldı; `AppSignal-1.0.5-setup.exe` (TLS yeniden deneme düzeltmesi dahil) `v1.0.5` sürümüne yüklendi. 7 (elle kurulum denemesi) ve Mac'teki imza adımları kaldı.
+1. `git pull`. `pubspec.yaml` `version: 1.0.6+7` olmalı; değiştirme.
+2. Derle: `flutter build windows --release`.
+3. Paketle: `& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.6 windows\installer\app_signal.iss`. Çıktı: `dist\AppSignal-1.0.6-setup.exe`.
+4. Kurulumu bir kez elle çalıştır: uygulama açılmalı, Ayarlar'da sürüm 1.0.6 görünmeli.
+5. `.exe`'yi sürüme yükle: `gh release upload v1.0.6 dist\AppSignal-1.0.6-setup.exe`.
+6. `appcast-windows.xml`'e dokunma. İmza Mac'te atılır; Mac o dosyayı değiştirir.
 
-1. `git pull`. `pubspec.yaml` `version: 1.0.5+6` olmalı; değiştirme.
-2. Visual Studio "Desktop development with C++" iş yükü ve Inno Setup 6 kurulu olsun. `flutter doctor` temiz çıkmalı.
-3. `assets/admob_oauth_client.json` yerinde olsun (Mac'ten güvenli yoldan kopyala). Yoksa Google ile giriş çalışmaz.
-4. Önce dene: `flutter run -d windows`. Derleme hatası çıkarsa düzelt, commit'le, pushla. Aşağıdaki "Derleme ve elle deneme" maddelerine bak.
-5. Derle: `flutter build windows --release`.
-6. Paketle: `& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.5 windows\installer\app_signal.iss`. Çıktı: `dist\AppSignal-1.0.5-setup.exe`.
-7. Kurulumu bir kez elle çalıştır: uygulama açılmalı, Başlat menüsünde görünmeli.
-8. `.exe`'yi sürüme yükle: `gh release upload v1.0.5 dist\AppSignal-1.0.5-setup.exe`.
-9. `appcast-windows.xml` yükleme. İmza Mac'te atılır.
+1.0.6'da Windows'ta denenecekler:
+
+- Uygulamayı kapatıp aç: Kurulum kartlarındaki "+N bugün" düşmemeli (anlık first_open dakikaları artık diske kaydediliyor).
+- Açılışta AdMob kartı "Bağla" yerine dönen gösterge göstermeli.
 
 ### Mac'te (exe yüklendikten sonra)
 
-1. İndir: `gh release download v1.0.5 -p "AppSignal-1.0.5-setup.exe" -D dist/v1.0.5`.
-2. İmzala: `macos/Pods/Sparkle/bin/sign_update dist/v1.0.5/AppSignal-1.0.5-setup.exe`. `sparkle:edSignature` ve `length` değerlerini al.
-3. `windows/installer/appcast-windows.template.xml`'i `dist/v1.0.5/appcast-windows.xml` olarak doldur: SURUM `1.0.5`, BUILD `6`, tarih, imza, boyut.
-4. Yükle: `gh release upload v1.0.5 dist/v1.0.5/appcast-windows.xml`.
-5. Denetle: `https://github.com/ilkayderici/app-signal/releases/latest/download/appcast-windows.xml` açılmalı.
+1. İndir: `gh release download v1.0.6 -p "AppSignal-1.0.6-setup.exe" -D dist/v1.0.6`.
+2. İmzala: `macos/Pods/Sparkle/bin/sign_update dist/v1.0.6/AppSignal-1.0.6-setup.exe`. `sparkle:edSignature` ve `length` değerlerini al.
+3. `windows/installer/appcast-windows.template.xml`'i `dist/v1.0.6/appcast-windows.xml` olarak doldur: SURUM `1.0.6`, BUILD `7`, tarih, imza, boyut.
+4. Yükle: `gh release upload v1.0.6 dist/v1.0.6/appcast-windows.xml --clobber`.
+5. Denetle: `https://github.com/ilkayderici/app-signal/releases/latest/download/appcast-windows.xml` 1.0.6'yı göstermeli.
 
-Bundan sonra Windows'taki uygulama Ayarlar > "Güncellemeleri denetle" ile 1.0.5'i görür. Sonraki sürümlerde aynı akış: önce Windows exe'yi yükler, sonra Mac imzalar.
+Sonraki sürümlerde aynı akış: Mac sürümü çıkarken bir önceki `appcast-windows.xml` yeni sürüme kopyalanır (Windows beslemesi bozulmasın), Windows exe'yi yükler, Mac imzalayıp appcast'i değiştirir.
 
 ## Yapıldı
 
