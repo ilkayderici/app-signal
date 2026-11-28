@@ -809,9 +809,26 @@ class _RevenueCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _money(r.today, r.currency),
-              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _money(r.today, r.currency),
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                // Bugünkü eBGBM: 1000 gösterim başına gelir.
+                if (r.ecpm != null)
+                  Text(
+                    'eBGBM ${_money(r.ecpm!, r.currency)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 8),
             Expanded(

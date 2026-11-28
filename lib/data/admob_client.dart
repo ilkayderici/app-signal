@@ -107,8 +107,17 @@ class AdmobClient {
 
   /// Bugün, dün, bu ay ve son 14 günün günlük geliri (eskiden yeniye,
   /// bugün dahil). [storeIds] verilirse (Apple kimliği / paket adı) yalnız o
-  /// uygulamalar; AdMob'da eşleşen yoksa null.
-  Future<({double today, double yesterday, double month, List<double> daily})?>
+  /// uygulamalar; AdMob'da eşleşen yoksa null. [ecpm] bugünün eBGBM'si
+  /// (gelir / gösterim × 1000); bugün gösterim yoksa null.
+  Future<
+    ({
+      double today,
+      double yesterday,
+      double month,
+      List<double> daily,
+      double? ecpm,
+    })?
+  >
   earnings({Set<String>? storeIds}) async {
     List<String>? appIds;
     if (storeIds != null) {
@@ -137,7 +146,7 @@ class AdmobClient {
         'reportSpec': {
           'dateRange': {'startDate': date(start), 'endDate': date(now)},
           'dimensions': ['DATE'],
-          'metrics': ['ESTIMATED_EARNINGS'],
+          'metrics': ['ESTIMATED_EARNINGS', 'IMPRESSIONS'],
           if (appIds != null)
             'dimensionFilters': [
               {
@@ -150,6 +159,7 @@ class AdmobClient {
     );
     if (res.statusCode != 200) throw StoreException(_error(res));
     final byDay = <String, double>{};
+    final impressions = <String, int>{};
     for (final part in jsonDecode(res.body) as List) {
       final row = (part as Map)['row'] as Map?;
       if (row == null) continue;
@@ -158,13 +168,19 @@ class AdmobClient {
         '${row['metricValues']?['ESTIMATED_EARNINGS']?['microsValue']}',
       );
       byDay[day] = (byDay[day] ?? 0) + (micros ?? 0) / 1e6;
+      final imp = int.tryParse(
+        '${row['metricValues']?['IMPRESSIONS']?['integerValue']}',
+      );
+      impressions[day] = (impressions[day] ?? 0) + (imp ?? 0);
     }
     String key(DateTime d) =>
         '${d.year}${d.month.toString().padLeft(2, '0')}'
         '${d.day.toString().padLeft(2, '0')}';
     final monthKey = key(DateTime(now.year, now.month, 1));
+    final todayImp = impressions[key(now)] ?? 0;
     return (
       today: byDay[key(now)] ?? 0,
+      ecpm: todayImp > 0 ? (byDay[key(now)] ?? 0) / todayImp * 1000 : null,
       yesterday: byDay[key(yday)] ?? 0,
       month: byDay.entries
           .where((e) => e.key.compareTo(monthKey) >= 0)

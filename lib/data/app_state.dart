@@ -178,6 +178,7 @@ class RevenueSummary {
     this.currency = 'USD',
     this.real = false,
     this.daily = const [],
+    this.ecpm,
   });
 
   final double today;
@@ -190,6 +191,9 @@ class RevenueSummary {
 
   /// AdMob raporundan (gerçek); false ise GA4 gelir ölçüsünden (tahmini).
   final bool real;
+
+  /// Bugünün eBGBM'si (1000 gösterim başına gelir). Yalnız AdMob verir.
+  final double? ecpm;
 }
 
 class AppState extends ChangeNotifier {
@@ -532,6 +536,7 @@ class AppState extends ChangeNotifier {
               currency: admob!.currency,
               real: true,
               daily: r.daily,
+              ecpm: r.ecpm,
             );
       admobError = null;
     } catch (e) {
