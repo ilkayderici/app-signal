@@ -2,6 +2,32 @@
 
 Windows kodu yazıldı ama henüz derlenip denenmedi. Bu makinedeki Visual Studio 2022'de "Desktop development with C++" iş yükü eksik (MSVC, C++ CMake araçları, Windows 10/11 SDK). Bu liste kalan işleri toplar.
 
+## Şimdi: 1.0.5 Windows kurulumunu çıkar
+
+Mac 1.0.5 yayında (GitHub sürümü `v1.0.5`). Sürümde Windows dosyaları yok; Windows'taki uygulama güncelleme bulamaz. Sırayla:
+
+### Windows'ta
+
+1. `git pull`. `pubspec.yaml` `version: 1.0.5+6` olmalı; değiştirme.
+2. Visual Studio "Desktop development with C++" iş yükü ve Inno Setup 6 kurulu olsun. `flutter doctor` temiz çıkmalı.
+3. `assets/admob_oauth_client.json` yerinde olsun (Mac'ten güvenli yoldan kopyala). Yoksa Google ile giriş çalışmaz.
+4. Önce dene: `flutter run -d windows`. Derleme hatası çıkarsa düzelt, commit'le, pushla. Aşağıdaki "Derleme ve elle deneme" maddelerine bak.
+5. Derle: `flutter build windows --release`.
+6. Paketle: `& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.5 windows\installer\app_signal.iss`. Çıktı: `dist\AppSignal-1.0.5-setup.exe`.
+7. Kurulumu bir kez elle çalıştır: uygulama açılmalı, Başlat menüsünde görünmeli.
+8. `.exe`'yi sürüme yükle: `gh release upload v1.0.5 dist\AppSignal-1.0.5-setup.exe`.
+9. `appcast-windows.xml` yükleme. İmza Mac'te atılır.
+
+### Mac'te (exe yüklendikten sonra)
+
+1. İndir: `gh release download v1.0.5 -p "AppSignal-1.0.5-setup.exe" -D dist/v1.0.5`.
+2. İmzala: `macos/Pods/Sparkle/bin/sign_update dist/v1.0.5/AppSignal-1.0.5-setup.exe`. `sparkle:edSignature` ve `length` değerlerini al.
+3. `windows/installer/appcast-windows.template.xml`'i `dist/v1.0.5/appcast-windows.xml` olarak doldur: SURUM `1.0.5`, BUILD `6`, tarih, imza, boyut.
+4. Yükle: `gh release upload v1.0.5 dist/v1.0.5/appcast-windows.xml`.
+5. Denetle: `https://github.com/ilkayderici/app-signal/releases/latest/download/appcast-windows.xml` açılmalı.
+
+Bundan sonra Windows'taki uygulama Ayarlar > "Güncellemeleri denetle" ile 1.0.5'i görür. Sonraki sürümlerde aynı akış: önce Windows exe'yi yükler, sonra Mac imzalar.
+
 ## Yapıldı
 
 - `windows/runner/main.cpp`: pencere baştan 420x720 açılıyor, başlık `App Signal`. Adlı mutex ile tek örnek var: ikinci açılış ilk pencereyi öne getirip çıkıyor. Güç kısıtlaması (EcoQoS) `SetProcessInformation(ProcessPowerThrottling)` ile kapalı.
