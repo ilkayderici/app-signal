@@ -8,7 +8,7 @@ Mac 1.0.5 yayında (GitHub sürümü `v1.0.5`). Sürümde Windows dosyaları yok
 
 ### Windows'ta
 
-Durum (28.11.2026): 1-6 yapıldı; `dist\AppSignal-1.0.5-setup.exe` derlendi (TLS yeniden deneme düzeltmesi dahil). Bu makinede `gh` kurulu değil: `winget install GitHub.cli`, sonra `gh auth login`, sonra 7-8.
+Durum (28.11.2026): 1-6 ve 8 yapıldı; `AppSignal-1.0.5-setup.exe` (TLS yeniden deneme düzeltmesi dahil) `v1.0.5` sürümüne yüklendi. 7 (elle kurulum denemesi) ve Mac'teki imza adımları kaldı.
 
 1. `git pull`. `pubspec.yaml` `version: 1.0.5+6` olmalı; değiştirme.
 2. Visual Studio "Desktop development with C++" iş yükü ve Inno Setup 6 kurulu olsun. `flutter doctor` temiz çıkmalı.
